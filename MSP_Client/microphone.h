@@ -3,7 +3,7 @@
 
 #include "includes.h"
 
-#define SAMPLE_FREQUENCY 8000 //16383
+#define SAMPLE_FREQUENCY 16000
 #define SMCLK_FREQUENCY  48000000
 
 /* DMA Control Table */
@@ -17,9 +17,6 @@ __attribute__ ((aligned (1024)))
 __align(1024)
 #endif
 static DMA_ControlTable MSP_EXP432P401RLP_DMAControlTable[32];
-/* Graphic library context */
-Graphics_Context g_sContext;
-
 
 int8_t mic_status;
 void _micInit();
@@ -58,69 +55,38 @@ void _micInit(){
     // Set ADC result format to signed binary
     ADC14_setResultFormat(ADC_SIGNED_BINARY);
 
-    // configuring DMA
-    DMA_enableModule();
-    DMA_setControlBase(MSP_EXP432P401RLP_DMAControlTable);
-
-    DMA_disableChannelAttribute(DMA_CH7_ADC14,
-                                UDMA_ATTR_ALTSELECT | UDMA_ATTR_USEBURST |
-                                UDMA_ATTR_HIGH_PRIORITY |
-                                UDMA_ATTR_REQMASK);
-
-    /* Assigning/Enabling Interrupts */
-    DMA_assignInterrupt(DMA_INT1, 7);
-    Interrupt_enableInterrupt(INT_DMA_INT1);
-    DMA_assignChannel(DMA_CH7_ADC14);
+    ADC14_enableInterrupt(ADC_INT0);
+    Interrupt_enableInterrupt(INT_ADC14);
     Interrupt_enableMaster();
 }
 
+int16_t *sample_dst;
+uint32_t sample_num;
+
 void micSample(int16_t *dst, uint32_t len){
-    /* Setting Control Indexes. In this case we will set the source of the
-     * DMA transfer to ADC14 Memory 0
-     *  and the destination to the
-     * destination data array. */
-    DMA_setChannelControl(
-        UDMA_PRI_SELECT | DMA_CH7_ADC14,
-        UDMA_SIZE_16 | UDMA_SRC_INC_NONE |
-        UDMA_DST_INC_16 | UDMA_ARB_1);
-    DMA_setChannelTransfer(UDMA_PRI_SELECT | DMA_CH7_ADC14,
-                           UDMA_MODE_PER_SCATTER_GATHER, (void*) &ADC14->MEM[0],
-                               dst, len);
+    sample_dst = dst;
+    sample_num = 0;
 
-    /* Assigning/Enabling Interrupts */
-    DMA_assignInterrupt(DMA_INT1, 7);
-    Interrupt_enableInterrupt(INT_DMA_INT1);
-    DMA_assignChannel(DMA_CH7_ADC14);
-    DMA_clearInterruptFlag(7);
-    Interrupt_enableMaster();
-
-    /* Now that the DMA is primed and setup, enabling the channels. The ADC14
-     * hardware should take over and transfer/receive all bytes */
-    DMA_enableChannel(7);
     ADC14_enableConversion();
 
     //wait until done
-    while (/*mic_status ==*/ 1);
+    while (sample_num < len);
 
-    //disable everything
-    DMA_disableChannel(7);
     ADC14_disableConversion();
-
 }
 
-#define SAMPLE_LENGTH 512
-int16_t data_array1[SAMPLE_LENGTH];
-int16_t data_array2[SAMPLE_LENGTH];
-
-
-/* Completion interrupt for ADC14 MEM0 */
-void DMA_INT1_IRQHandler(void)
+void ADC14_IRQHandler(void)
 {
-    mic_status++;
-    char str[7];
-    sprintf(str, "%d", mic_status);
-    Graphics_drawString(& g_sContext, str, -1, 20, 30, true);
+    uint64_t status;
+
+    status = ADC14_getEnabledInterruptStatus();
+    ADC14_clearInterruptFlag(status);
+
+    /* ADC_MEM0 conversion completed */
+    if(status & ADC_INT0)
+    {
+        /* Store ADC14 conversion results */
+        sample_dst[sample_num++] = ADC14_getResult(ADC_MEM0);
+    }
 }
-
-
 #endif
