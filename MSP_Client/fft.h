@@ -36,7 +36,7 @@ void feature_extraction (int16_t *s, float *out){
        }
        // Compute the first 13 coefficients of MFCC
        for(coeff = 0; coeff < 13; coeff++)   {
-           out[coeff+i*13] = GetCoefficient(data_temp, 16000, 18, FFT_WINDOW, coeff);
+           out[coeff+i*13] = GetCoefficient(data_temp, 16000, 20, FFT_WINDOW, coeff);
        }
     }
 }

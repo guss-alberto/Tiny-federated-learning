@@ -4,5 +4,6 @@
 #include "lib/LcdDriver/Crystalfontz128x128_ST7735.h"
 #include "lib/UART_Driver.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <arm_math.h>
 #include <arm_const_structs.h>
