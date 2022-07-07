@@ -7,3 +7,17 @@
 #include <stdlib.h>
 #include <arm_math.h>
 #include <arm_const_structs.h>
+
+Graphics_Context ctx;
+
+
+#define NUM_SAMPLES 8192
+
+#define NUM_MEL_BANDS 21
+#define MFCC_COEFF  10
+#define NUM_FRAMES  32
+
+#define TRAINING_ROUNDS_BEFORE_FL 10
+
+#define NODES_L1 25
+#define NODES_L2 3

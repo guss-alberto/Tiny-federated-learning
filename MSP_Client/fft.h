@@ -2,44 +2,61 @@
 #define __FFT_H__
 
 #include "includes.h"
-#include "libmfcc.h"
 
-#define FFT_WINDOW 320
-float hann[FFT_WINDOW];
+#define FFT_WINDOW NUM_SAMPLES/NUM_FRAMES
 volatile arm_status status;
 
-void fft_init(){
-    int n;
-    for(n = 0; n < FFT_WINDOW; n++) {
-        hann[n] = 0.5f - 0.5f * cosf((2 * PI * n) / (SAMPLE_LENGTH - 1));
-    }
-}
+#define DO_BIT_REVERSE 1
+#define FFT_FORWARD_TRANSFORM 0
 
 void feature_extraction (int16_t *s, float *out){
-    int i, j, coeff;
-    int16_t data_input[FFT_WINDOW * 2];
-    float data_temp[FFT_WINDOW];
-    for (i=0; i<32; i++){
-       /*for(j = 0; j < FFT_WINDOW; j++){
-           s[j+i*FFT_WINDOW] = (int16_t)(hann[j] * s[j+i*FFT_WINDOW]);
-       }*/
-
+    uint32_t i, j, k;
+    int16_t fft_data[FFT_WINDOW * 2];
+    double data_temp[FFT_WINDOW];
+    for (i=0; i<NUM_FRAMES; i++){
        arm_rfft_instance_q15 instance;
-       status = arm_rfft_init_q15(&instance, FFT_WINDOW, 0, 1);
+       status = arm_rfft_init_q15(&instance, FFT_WINDOW, FFT_FORWARD_TRANSFORM, DO_BIT_REVERSE);
 
-       arm_rfft_q15(&instance, s+i*FFT_WINDOW, data_input);
+       arm_rfft_q15(&instance, s+i*FFT_WINDOW, fft_data);
 
-       //calculate magnitude
+       //calculate magnitude in log scale
        for(j = 0; j < FFT_WINDOW * 2; j += 2) {
-           data_temp[ j / 2 ] =(int32_t)(sqrtf((data_input[j] * data_input[j]) +
-                                               (data_input[j + 1] * data_input[j + 1])));
+           data_temp[ j / 2 ] = log((sqrtf((fft_data[j] * fft_data[j]) +
+                                           (fft_data[j + 1] * fft_data[j + 1]))));
        }
-       // Compute the first 13 coefficients of MFCC
-       for(coeff = 0; coeff < 13; coeff++)   {
-           out[coeff+i*13] = GetCoefficient(data_temp, 16000, 20, FFT_WINDOW, coeff);
+
+
+       //convert to log frequency scale
+       float mel[NUM_MEL_BANDS];
+       int16_t band_size = 1;
+       int16_t prev_band = 0;
+       int16_t curr_band = 1;
+       int16_t next_band = 3;
+       for (j = 0; next_band < FFT_WINDOW; j++){
+           for (k = prev_band; k < next_band; k++){
+               if (k < curr_band)
+                   mel[j] += data_temp[k]*(curr_band-k)*(1.0/band_size);
+               else
+                   mel[j] += data_temp[k]*(k-curr_band)*(1.0/band_size);
+          }
+           prev_band = curr_band;
+           curr_band = next_band;
+           next_band += band_size;
+           band_size++;
        }
+
+
+       //calculate first MFCC_COEFF of MFCC with DCT
+       for (k = 0; k < MFCC_COEFF; ++k) {
+           float sum = 0.;
+           float s = (k == 0) ? sqrt(.5) : 1.;
+           for (j = 0; j < NUM_MEL_BANDS; ++j) {
+             sum += s * mel[j] * cos(M_PI * (j + .5) * k / NUM_MEL_BANDS);
+           }
+           out[k] = sum * sqrt(2. / NUM_MEL_BANDS);
+         }
+
     }
 }
 
 #endif
-

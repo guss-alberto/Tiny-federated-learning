@@ -1,22 +1,64 @@
 #include "includes.h"
 #include "microphone.h"
+#include "fft.h"
+#include "ml.h"
 
-/* ------------------------------------------------------------------
- * Global variables for FFT Bin Example
- * ------------------------------------------------------------------- */
-uint32_t ifftFlag = 0;
-uint32_t doBitReverse = 1;
-volatile arm_status status;
 
-/* Graphic library context */
-Graphics_Context g_sContext;
+void init();
 
-volatile int switch_data = 0;
 
-uint32_t color = 0;
+#define MODE_LEARN 1
+#define MODE_EVAL  0
+#define MODE_FL    0b01
+#define REMOTE_DATA 0b001
+
+int8_t mode = MODE_LEARN & MODE_FL;
 
 int main(void)
 {
+    init();
+    int16_t rec[NUM_SAMPLES];
+
+    Graphics_drawString(&ctx, "sampling...", 10, 10, 10, true);
+    micSample(rec, NUM_SAMPLES);
+
+    Graphics_drawString(&ctx, "sending...", 20, 10, 10, true);
+    UART_Write(EUSCI_A0_BASE, (void*)rec, sizeof(rec));
+
+    Graphics_drawString(&ctx, "processing...", 20, 10, 10, true);
+    UART_Write(EUSCI_A0_BASE, (void*)rec, sizeof(rec));
+    float out[MFCC_COEFF*NUM_FRAMES];
+    feature_extraction (rec, out);
+
+    Graphics_drawString(&ctx, "sending...", 20, 10, 10, true);
+    UART_Write(EUSCI_A0_BASE, (void*)out, sizeof(out));
+
+    Graphics_drawString(&ctx, "done...", 30, 10, 10, true);
+    /*while(1)
+    {
+        if (mode & MODE_LEARN){
+
+        } else if (mode & MODE_EVAL){
+
+        }
+    }*/
+}
+
+eUSCI_UART_ConfigV1 UART0Config =
+{
+     EUSCI_A_UART_CLOCKSOURCE_SMCLK,
+     13,
+     0,
+     37,
+     EUSCI_A_UART_NO_PARITY,
+     EUSCI_A_UART_LSB_FIRST,
+     EUSCI_A_UART_ONE_STOP_BIT,
+     EUSCI_A_UART_MODE,
+     EUSCI_A_UART_OVERSAMPLING_BAUDRATE_GENERATION
+};
+
+
+void init(){
     /* Halting WDT and disabling master interrupts */
     WDT_A_holdTimer();
     Interrupt_disableMaster();
@@ -32,10 +74,8 @@ int main(void)
     CS_setDCOCenteredFrequency(CS_DCO_FREQUENCY_48);
     CS_initClockSignal(CS_MCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1);
     CS_initClockSignal(CS_HSMCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1);
-    CS_initClockSignal(CS_SMCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1);
+    CS_initClockSignal(CS_SMCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_2);
     CS_initClockSignal(CS_ACLK, CS_REFOCLK_SELECT, CS_CLOCK_DIVIDER_1);
-
-    _micInit();
 
 
     /* Initializes display */
@@ -46,26 +86,15 @@ int main(void)
 
 
     /* Initializes graphics context */
-    Graphics_initContext(&g_sContext, &g_sCrystalfontz128x128,
+    Graphics_initContext(&ctx, &g_sCrystalfontz128x128,
                          &g_sCrystalfontz128x128_funcs);
 
-    Graphics_setForegroundColor(&g_sContext, GRAPHICS_COLOR_BLACK);
-    Graphics_setBackgroundColor(&g_sContext, GRAPHICS_COLOR_WHITE);
-    GrContextFontSet(&g_sContext, &g_sFontFixed6x8);
-    Graphics_clearDisplay(&g_sContext);
+    Graphics_setForegroundColor(&ctx, GRAPHICS_COLOR_BLACK);
+    Graphics_setBackgroundColor(&ctx, GRAPHICS_COLOR_WHITE);
+    GrContextFontSet(&ctx, &g_sFontFixed6x8);
+    Graphics_clearDisplay(&ctx);
 
-    Graphics_drawString(& g_sContext, "INIT OK", -1, 10, 10, true);
-
-
-
-    int16_t sample[16000];
-    micSample(sample, 16000);
-
-    Graphics_drawString(& g_sContext, "SAMPLE OK", -1, 10, 20, true);
-
-    while(1)
-    {
-
-    }
+    UART_Init(EUSCI_A0_BASE, UART0Config);
+    _micInit();
+    //ml_init();
 }
-

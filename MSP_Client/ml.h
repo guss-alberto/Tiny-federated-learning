@@ -3,7 +3,7 @@
 
 #include "includes.h"
 
-#define NODES_L0 13*50
+#define NODES_L0 MFCC_COEFF*NUM_FRAMES
 #define NODES_L1 25
 #define NODES_L2 3
 
@@ -19,13 +19,15 @@ float change_L2[NODES_L2][NODES_L1+1];
 //initializes the weight values to random
 void ml_init();
 
-//
+//uses the neural network model to classify the input
 void eval (float *input, float *out);
 
 //backpropagates error and updates, return value is error
 float learn (float *input, float *out, float *target);
 
-
+//sends or get the model data over UART
+void sendModel ();
+void getModel ();
 
 void ml_init(){
     int i, j;
@@ -36,7 +38,6 @@ void ml_init(){
         }
     }
     for (i=0; i<NODES_L2; i++){
-        temp=weights_L2[i][0];
         for (j=0; j<=NODES_L1; j++){
             weights_L2[i][j] = ((float)rand()/RAND_MAX)-.5;
             change_L2[i][j] = 0;
@@ -102,7 +103,7 @@ float learn (float *input, float *out, float *target){
        for(j=0; j < NODES_L2; j++) {
            temp += weights_L2[i][j+1]*delta_L2[j] ;
        }
-       delta_L1[i] = Accum * Hidden[i] * (1.0 - Hidden[i]) ;
+       delta_L1[i] = temp * hiddenLayer[i] * (1.0 - hiddenLayer[i]) ;
    }
 
 
@@ -110,7 +111,7 @@ float learn (float *input, float *out, float *target){
    for(i=0; i < NODES_L1; i++) {
        change_L1[i][0] = LearningRate * delta_L1[i] + Momentum * change_L1[i][0];
        weights_L1[i][0] += change_L1[i][0];
-       for(int j = 0 ; j < NODES_L0 ; j++ ) {
+       for(j = 0 ; j < NODES_L0 ; j++ ) {
            change_L1 [i][j+1] = LearningRate * input[j] * delta_L1[i] + Momentum * change_L1[i][j+1];
            weights_L1[i][j+1] += change_L1[i][j+1] ;
        }
@@ -121,11 +122,23 @@ float learn (float *input, float *out, float *target){
    for(i=0; i < NODES_L2; i++) {
        change_L2[i][0] = LearningRate * delta_L2[i] + Momentum * change_L2[i][0];
        weights_L2[i][0] += change_L2[i][0];
-       for(int j = 0 ; j < NODES_L1 ; j++ ) {
+       for(j = 0 ; j < NODES_L1 ; j++ ) {
            change_L2 [i][j+1] = LearningRate * input[j] * delta_L2[i] + Momentum * change_L2[i][j+1];
            weights_L2[i][j+1] += change_L2[i][j+1] ;
        }
    }
    return error;
 }
+
+
+void sendModel (){
+    UART_Write(EUSCI_A0_BASE, (void*)weights_L1, sizeof(weights_L1));
+    UART_Write(EUSCI_A0_BASE, (void*)weights_L2, sizeof(weights_L2));
+}
+
+void getModel (){
+    while(!UART_Read(EUSCI_A0_BASE, (void*)weights_L1, sizeof(weights_L1)));
+    while(!UART_Read(EUSCI_A0_BASE, (void*)weights_L2, sizeof(weights_L2)));
+}
+
 #endif
