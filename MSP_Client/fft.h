@@ -53,7 +53,7 @@ void feature_extraction (int16_t *s, float *out){
            for (j = 0; j < NUM_MEL_BANDS; ++j) {
              sum += s * mel[j] * cos(M_PI * (j + .5) * k / NUM_MEL_BANDS);
            }
-           out[k] = sum * sqrt(2. / NUM_MEL_BANDS);
+           out[k+MFCC_COEFF*i] = sum * sqrt(2. / NUM_MEL_BANDS);
          }
 
     }

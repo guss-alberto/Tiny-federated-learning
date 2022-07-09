@@ -78,15 +78,15 @@ void micSample(int16_t *dst, uint32_t len){
 void ADC14_IRQHandler(void)
 {
     uint64_t status;
-
     status = ADC14_getEnabledInterruptStatus();
-    ADC14_clearInterruptFlag(status);
-
     /* ADC_MEM0 conversion completed */
     if(status & ADC_INT0)
     {
         /* Store ADC14 conversion results */
         sample_dst[sample_num++] = ADC14_getResult(ADC_MEM0);
     }
+
+
+    ADC14_clearInterruptFlag(status);
 }
 #endif

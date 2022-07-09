@@ -14,7 +14,7 @@ Graphics_Context ctx;
 #define NUM_SAMPLES 8192
 
 #define NUM_MEL_BANDS 21
-#define MFCC_COEFF  10
+#define MFCC_COEFF  9
 #define NUM_FRAMES  32
 
 #define TRAINING_ROUNDS_BEFORE_FL 10

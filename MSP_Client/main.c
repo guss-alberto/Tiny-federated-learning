@@ -22,9 +22,6 @@ int main(void)
     Graphics_drawString(&ctx, "sampling...", 10, 10, 10, true);
     micSample(rec, NUM_SAMPLES);
 
-    Graphics_drawString(&ctx, "sending...", 20, 10, 10, true);
-    UART_Write(EUSCI_A0_BASE, (void*)rec, sizeof(rec));
-
     Graphics_drawString(&ctx, "processing...", 20, 10, 10, true);
     UART_Write(EUSCI_A0_BASE, (void*)rec, sizeof(rec));
     float out[MFCC_COEFF*NUM_FRAMES];
@@ -33,18 +30,16 @@ int main(void)
     Graphics_drawString(&ctx, "sending...", 20, 10, 10, true);
     UART_Write(EUSCI_A0_BASE, (void*)out, sizeof(out));
 
-    Graphics_drawString(&ctx, "done...", 30, 10, 10, true);
-    /*while(1)
-    {
-        if (mode & MODE_LEARN){
-
-        } else if (mode & MODE_EVAL){
-
-        }
-    }*/
+    float res[NODES_L2];
+    Graphics_drawString(&ctx, "evaluating...", 30, 10, 10, true);
+    eval (out, res);
+    Graphics_drawString(&ctx, "done!        ", 30, 10, 10, true);
+    char str[20];
+    sprintf(str, "%.2f - %.2f - %.2f", res[0], res[1], res[2]);
+    Graphics_drawString(&ctx, (int8_t*)str, 20, 10, 30, true);
 }
 
-eUSCI_UART_ConfigV1 UART0Config =
+const eUSCI_UART_ConfigV1 UART0Config =
 {
      EUSCI_A_UART_CLOCKSOURCE_SMCLK,
      13,
@@ -96,5 +91,8 @@ void init(){
 
     UART_Init(EUSCI_A0_BASE, UART0Config);
     _micInit();
-    //ml_init();
+    ml_init();
 }
+
+/* Cortex-M4 Processor Exceptions */
+void HardFault_Handler  () {Graphics_drawString(&ctx, "HardFault_Handler ", 10, 10, 50, true);}
