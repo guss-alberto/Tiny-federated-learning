@@ -45,60 +45,28 @@ void UART_Init(uint32_t UART, eUSCI_UART_ConfigV1 UARTConfig)
     }
 }
 
-void UART_Write(uint32_t UART, uint8_t *Data, uint32_t Size)
+void UART_Write(uint8_t *Data, uint32_t Size)
 {
     uint32_t i;
     for(i = 0; i < Size; i++)
     {
-        MAP_UART_transmitData(UART, Data[i]);
+        MAP_UART_transmitData(EUSCI_A0_BASE, Data[i]);
     }
 }
 
-uint32_t UART_Read(uint32_t UART, uint8_t *Data, uint32_t Size)
+uint32_t UART_Read(uint8_t *Data, uint32_t Size)
 {
     uint32_t i;
     int8_t c;
 
-    switch(UART)
+    for(i = 0; i < Size; i++)
     {
-    case EUSCI_A0_BASE:
-        for(i = 0; i < Size; i++)
-        {
-            if(UARTA0_BUFFER_EMPTY)
-            {
-                return i;
-            }
-            else
-            {
-                c = UARTA0Data[UARTA0ReadIndex];
-                UARTA0_ADVANCE_READ_INDEX;
+        while(UARTA0_BUFFER_EMPTY);//wait until there is enough data
+        c = UARTA0Data[UARTA0ReadIndex];
+        UARTA0_ADVANCE_READ_INDEX;
 
-                Data[i] = c;
-            }
-        }
-    break;
-
-    case EUSCI_A2_BASE:
-        for(i = 0; i < Size; i++)
-        {
-            if(UARTA2_BUFFER_EMPTY)
-            {
-                return i;
-            }
-            else
-            {
-                c = UARTA2Data[UARTA2ReadIndex];
-                UARTA2_ADVANCE_READ_INDEX;
-
-                Data[i] = c;
-            }
-        }
-    break;
-    /*More UART reading modules go here*/
-    default:
-        return 0;
+        Data[i] = c;
     }
-
     return i;
 }
 
@@ -128,24 +96,3 @@ void EUSCIA0_IRQHandler(void)
     }
 }
 
-void EUSCIA2_IRQHandler(void)
-{
-    uint8_t c;
-    uint32_t status = MAP_UART_getEnabledInterruptStatus(EUSCI_A2_BASE);
-    MAP_UART_clearInterruptFlag(EUSCI_A2_BASE, status);
-
-    if(status & EUSCI_A_UART_RECEIVE_INTERRUPT)
-    {
-        c = MAP_UART_receiveData(EUSCI_A2_BASE);
-
-        if(UARTA2_BUFFER_FULL)
-        {
-            /*TODO: Buffer Overflow, add handler here*/
-        }
-        else
-        {
-            UARTA2Data[UARTA2WriteIndex] = c;
-            UARTA2_ADVANCE_WRITE_INDEX;
-        }
-    }
-}

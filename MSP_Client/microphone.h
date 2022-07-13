@@ -20,7 +20,7 @@ static DMA_ControlTable MSP_EXP432P401RLP_DMAControlTable[32];
 
 int8_t mic_status;
 void _micInit();
-void micSample(int16_t *dst, uint32_t len);
+void micSample(int16_t *dst);
 
 /* Timer_A PWM Configuration Parameter */
 Timer_A_PWMConfig pwmConfig =
@@ -63,15 +63,14 @@ void _micInit(){
 int16_t *sample_dst;
 uint32_t sample_num;
 
-void micSample(int16_t *dst, uint32_t len){
+void micSample(int16_t *dst){
     sample_dst = dst;
     sample_num = 0;
 
     ADC14_enableConversion();
 
     //wait until done
-    while (sample_num < len);
-
+    while (sample_num<NUM_SAMPLES);
     ADC14_disableConversion();
 }
 
@@ -80,13 +79,13 @@ void ADC14_IRQHandler(void)
     uint64_t status;
     status = ADC14_getEnabledInterruptStatus();
     /* ADC_MEM0 conversion completed */
-    if(status & ADC_INT0)
-    {
+    if(status & ADC_INT0){
         /* Store ADC14 conversion results */
-        sample_dst[sample_num++] = ADC14_getResult(ADC_MEM0);
+        if (sample_num<NUM_SAMPLES)
+            sample_dst[sample_num++] = ADC14_getResult(ADC_MEM0);
+        else //if all samples have been taken, stop sampling
+            ADC14_disableConversion();
     }
-
-
     ADC14_clearInterruptFlag(status);
 }
 #endif

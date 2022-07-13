@@ -3,10 +3,10 @@
 
 #include "includes.h"
 
-#define FFT_WINDOW NUM_SAMPLES/NUM_FRAMES
+
 volatile arm_status status;
 
-#define DO_BIT_REVERSE 1
+#define DO_BIT_REVERSE 0
 #define FFT_FORWARD_TRANSFORM 0
 
 void feature_extraction (int16_t *s, float *out){
@@ -22,27 +22,27 @@ void feature_extraction (int16_t *s, float *out){
        //calculate magnitude in log scale
        for(j = 0; j < FFT_WINDOW * 2; j += 2) {
            data_temp[ j / 2 ] = log((sqrtf((fft_data[j] * fft_data[j]) +
-                                           (fft_data[j + 1] * fft_data[j + 1]))));
+                                           (fft_data[j + 1] * fft_data[j + 1])))+1);
        }
 
 
        //convert to log frequency scale
        float mel[NUM_MEL_BANDS];
-       int16_t band_size = 1;
        int16_t prev_band = 0;
        int16_t curr_band = 1;
        int16_t next_band = 3;
-       for (j = 0; next_band < FFT_WINDOW; j++){
+       for (j = 1; next_band < FFT_WINDOW; j++){
+           float temp = 0;
            for (k = prev_band; k < next_band; k++){
                if (k < curr_band)
-                   mel[j] += data_temp[k]*(curr_band-k)*(1.0/band_size);
+                   temp += data_temp[k]*(curr_band-k)*(1.0/j);
                else
-                   mel[j] += data_temp[k]*(k-curr_band)*(1.0/band_size);
+                   temp += data_temp[k]*(k-curr_band)*(1.0/j);
           }
+           mel[j]=temp;
            prev_band = curr_band;
            curr_band = next_band;
-           next_band += band_size;
-           band_size++;
+           next_band += j;
        }
 
 
@@ -53,7 +53,7 @@ void feature_extraction (int16_t *s, float *out){
            for (j = 0; j < NUM_MEL_BANDS; ++j) {
              sum += s * mel[j] * cos(M_PI * (j + .5) * k / NUM_MEL_BANDS);
            }
-           out[k+MFCC_COEFF*i] = sum * sqrt(2. / NUM_MEL_BANDS);
+           out[k+MFCC_COEFF*i] = sum * sqrt(2.0 / NUM_MEL_BANDS);
          }
 
     }

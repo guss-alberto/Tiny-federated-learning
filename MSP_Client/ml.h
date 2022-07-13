@@ -4,17 +4,15 @@
 #include "includes.h"
 
 #define NODES_L0 MFCC_COEFF*NUM_FRAMES
-#define NODES_L1 25
-#define NODES_L2 3
 
 float LearningRate = 0.3;
 float Momentum = 0.9;
 
 float weights_L1[NODES_L1][NODES_L0+1];
-float weights_L2[NODES_L2][NODES_L1+1];
+float change_L1 [NODES_L1][NODES_L0+1];
 
-float change_L1[NODES_L1][NODES_L0+1];
-float change_L2[NODES_L2][NODES_L1+1];
+float weights_L2[NODES_L2][NODES_L1+1];
+float change_L2 [NODES_L2][NODES_L1+1];
 
 //initializes the weight values to random
 void ml_init();
@@ -30,16 +28,16 @@ void sendModel ();
 void getModel ();
 
 void ml_init(){
-    int i, j;
+    uint16_t i, j;
     for (i=0; i<NODES_L1; i++){
         for (j=0; j<=NODES_L0; j++){
-            weights_L1[i][j] = ((float)rand()/RAND_MAX)-.5;
+            weights_L1[0][j] = (2.0*(float)rand()/RAND_MAX)-1.0;
             change_L1[i][j] = 0;
         }
     }
     for (i=0; i<NODES_L2; i++){
         for (j=0; j<=NODES_L1; j++){
-            weights_L2[i][j] = ((float)rand()/RAND_MAX)-.5;
+            weights_L2[i][j] = (2.0*(float)rand()/RAND_MAX)-1.0;
             change_L2[i][j] = 0;
         }
     }
@@ -132,13 +130,13 @@ float learn (float *input, float *out, float *target){
 
 
 void sendModel (){
-    UART_Write(EUSCI_A0_BASE, (void*)weights_L1, sizeof(weights_L1));
-    UART_Write(EUSCI_A0_BASE, (void*)weights_L2, sizeof(weights_L2));
+    UART_Write((void*)weights_L1, sizeof(weights_L1));
+    UART_Write((void*)weights_L2, sizeof(weights_L2));
 }
 
 void getModel (){
-    while(!UART_Read(EUSCI_A0_BASE, (void*)weights_L1, sizeof(weights_L1)));
-    while(!UART_Read(EUSCI_A0_BASE, (void*)weights_L2, sizeof(weights_L2)));
+    UART_Read((void*)weights_L1, sizeof(weights_L1));
+    UART_Read((void*)weights_L2, sizeof(weights_L2));
 }
 
 #endif

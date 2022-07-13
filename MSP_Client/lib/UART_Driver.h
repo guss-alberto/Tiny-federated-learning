@@ -11,7 +11,7 @@
 #define UARTA2_BUFFERSIZE 128
 
 void UART_Init(uint32_t UART, eUSCI_UART_ConfigV1 UARTConfig);
-void UART_Write(uint32_t UART, uint8_t *Data, uint32_t Size);
-uint32_t UART_Read(uint32_t UART, uint8_t *Data, uint32_t Size);
+void UART_Write(uint8_t *Data, uint32_t Size);
+uint32_t UART_Read(uint8_t *Data, uint32_t Size);
 
 #endif /* HARDWARE_UART_DRIVER_H_ */

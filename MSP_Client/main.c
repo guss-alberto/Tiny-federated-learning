@@ -14,27 +14,27 @@ void init();
 
 int8_t mode = MODE_LEARN & MODE_FL;
 
+int16_t rec[NUM_SAMPLES];
+
 int main(void)
 {
     init();
-    int16_t rec[NUM_SAMPLES];
-
+    char str[10];
     Graphics_drawString(&ctx, "sampling...", 10, 10, 10, true);
-    micSample(rec, NUM_SAMPLES);
+    micSample(rec);
 
     Graphics_drawString(&ctx, "processing...", 20, 10, 10, true);
-    UART_Write(EUSCI_A0_BASE, (void*)rec, sizeof(rec));
+    UART_Write((void*)rec, sizeof(rec));
     float out[MFCC_COEFF*NUM_FRAMES];
     feature_extraction (rec, out);
 
     Graphics_drawString(&ctx, "sending...", 20, 10, 10, true);
-    UART_Write(EUSCI_A0_BASE, (void*)out, sizeof(out));
+    UART_Write((void*)out, sizeof(out));
 
     float res[NODES_L2];
     Graphics_drawString(&ctx, "evaluating...", 30, 10, 10, true);
     eval (out, res);
     Graphics_drawString(&ctx, "done!        ", 30, 10, 10, true);
-    char str[20];
     sprintf(str, "%.2f - %.2f - %.2f", res[0], res[1], res[2]);
     Graphics_drawString(&ctx, (int8_t*)str, 20, 10, 30, true);
 }
@@ -94,5 +94,6 @@ void init(){
     ml_init();
 }
 
-/* Cortex-M4 Processor Exceptions */
-void HardFault_Handler  () {Graphics_drawString(&ctx, "HardFault_Handler ", 10, 10, 50, true);}
+
+
+

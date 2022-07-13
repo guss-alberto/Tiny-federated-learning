@@ -11,11 +11,14 @@
 Graphics_Context ctx;
 
 
-#define NUM_SAMPLES 8192
 
-#define NUM_MEL_BANDS 21
+
+#define NUM_MEL_BANDS 22
 #define MFCC_COEFF  9
-#define NUM_FRAMES  32
+#define NUM_FRAMES  25
+#define FFT_WINDOW 256
+
+#define NUM_SAMPLES FFT_WINDOW*NUM_FRAMES
 
 #define TRAINING_ROUNDS_BEFORE_FL 10
 
