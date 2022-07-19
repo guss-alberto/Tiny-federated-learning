@@ -8,10 +8,11 @@
 #include <ti/devices/msp432p4xx/driverlib/gpio.h>
 
 #define UARTA0_BUFFERSIZE 128
-#define UARTA2_BUFFERSIZE 128
 
 void UART_Init(uint32_t UART, eUSCI_UART_ConfigV1 UARTConfig);
 void UART_Write(uint8_t *Data, uint32_t Size);
-uint32_t UART_Read(uint8_t *Data, uint32_t Size);
+void UART_Read(uint8_t *Data, uint32_t Size);
+uint32_t UART_Read_nb(uint8_t *Data, uint32_t Size); //non blocking, returns the number of bytes read
+
 
 #endif /* HARDWARE_UART_DRIVER_H_ */

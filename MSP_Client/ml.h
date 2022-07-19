@@ -5,6 +5,7 @@
 
 #define NODES_L0 MFCC_COEFF*NUM_FRAMES
 
+uint16_t num_epochs = 0;
 float LearningRate = 0.3;
 float Momentum = 0.9;
 

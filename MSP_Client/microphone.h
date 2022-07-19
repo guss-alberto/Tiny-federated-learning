@@ -3,22 +3,6 @@
 
 #include "includes.h"
 
-#define SAMPLE_FREQUENCY 16000
-#define SMCLK_FREQUENCY  48000000
-
-/* DMA Control Table */
-#if defined(__TI_COMPILER_VERSION__)
-#pragma DATA_ALIGN(MSP_EXP432P401RLP_DMAControlTable, 1024)
-#elif defined(__IAR_SYSTEMS_ICC__)
-#pragma data_alignment=1024
-#elif defined(__GNUC__)
-__attribute__ ((aligned (1024)))
-#elif defined(__CC_ARM)
-__align(1024)
-#endif
-static DMA_ControlTable MSP_EXP432P401RLP_DMAControlTable[32];
-
-int8_t mic_status;
 void _micInit();
 void micSample(int16_t *dst);
 
@@ -27,10 +11,10 @@ Timer_A_PWMConfig pwmConfig =
 {
     TIMER_A_CLOCKSOURCE_SMCLK,
     TIMER_A_CLOCKSOURCE_DIVIDER_1,
-    (SMCLK_FREQUENCY / SAMPLE_FREQUENCY),
+    (SMCLK_FREQUENCY / (SAMPLE_FREQUENCY*2)),
     TIMER_A_CAPTURECOMPARE_REGISTER_1,
     TIMER_A_OUTPUTMODE_SET_RESET,
-    (SMCLK_FREQUENCY / SAMPLE_FREQUENCY) / 2
+    (SMCLK_FREQUENCY / (SAMPLE_FREQUENCY*2)) / 2
 };
 
 
