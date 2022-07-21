@@ -9,20 +9,26 @@ volatile arm_status status;
 #define DO_BIT_REVERSE 0
 #define FFT_FORWARD_TRANSFORM 0
 
+
+
+
 void feature_extraction (int16_t *s, float *out){
     uint32_t i, j, k;
-    int16_t fft_data[FFT_WINDOW * 2];
-    double data_temp[FFT_WINDOW];
+    union {
+        int16_t raw_fft[FFT_WINDOW * 2];
+        float   log[FFT_WINDOW];
+    } temp_data;
+
     for (i=0; i<NUM_FRAMES; i++){
        arm_rfft_instance_q15 instance;
        status = arm_rfft_init_q15(&instance, FFT_WINDOW, FFT_FORWARD_TRANSFORM, DO_BIT_REVERSE);
 
-       arm_rfft_q15(&instance, s+i*FFT_WINDOW, fft_data);
+       arm_rfft_q15(&instance, s+i*FFT_WINDOW, temp_data.raw_fft);
 
        //calculate magnitude in log scale
        for(j = 0; j < FFT_WINDOW * 2; j += 2) {
-           data_temp[ j / 2 ] = log((sqrtf((fft_data[j] * fft_data[j]) +
-                                           (fft_data[j + 1] * fft_data[j + 1])))+1);
+           temp_data.log[ j / 2 ] = log((sqrtf((temp_data.raw_fft[j]     * temp_data.raw_fft[j]) +
+                                               (temp_data.raw_fft[j + 1] * temp_data.raw_fft[j + 1])))+1);
        }
 
 
@@ -35,9 +41,9 @@ void feature_extraction (int16_t *s, float *out){
            float temp = 0;
            for (k = prev_band; k < next_band; k++){
                if (k < curr_band)
-                   temp += data_temp[k]*(curr_band-k)*(1.0/j);
+                   temp += temp_data.log[k]*(curr_band-k)*(1.0/j);
                else
-                   temp += data_temp[k]*(k-curr_band)*(1.0/j);
+                   temp += temp_data.log[k]*(k-curr_band)*(1.0/j);
           }
            mel[j]=temp;
            prev_band = curr_band;

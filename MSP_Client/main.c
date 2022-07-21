@@ -9,7 +9,7 @@ uint8_t buttons();
 
 
 
-uint8_t mode = MODE_RECORD;
+uint8_t mode = MODE_EVAL;
 
 union { //use union to save memory
     int16_t rec[NUM_SAMPLES];
@@ -37,8 +37,7 @@ int main(void)
                 getModel();         //wait to receive new model
                 num_epochs=0;       //reset number of epochs to zero
                 break;
-            case FL_CHANGE_MODE:
-                UART_Write(&mode, 1); //send old mode value
+            case CHANGE_MODE:
                 UART_Read(&mode, 1);  //update mode value
                 Graphics_clearDisplay(&ctx); //reset screen
                 Graphics_drawString(&ctx, (int8_t*)modeStr[(mode&MODE_S) - 1], 20, 20, 10, true);
@@ -49,8 +48,15 @@ int main(void)
         switch (mode & MODE_S){
         case MODE_LEARN:
             if (mode & MODE_REMOTE_TRAIN ){
-                a=FL_REQUEST_DATA;
+                a=REQUEST_TRAINING_DATA;
                 UART_Write(&a,1);   //send request for training data
+                UART_Read(&a,1);    //read response before
+                if ( a != 0 ) {
+                    mode = a;
+                    Graphics_clearDisplay(&ctx); //reset screen
+                    Graphics_drawString(&ctx, (int8_t*)modeStr[(mode&MODE_S) - 1], 20, 20, 10, true);
+                    break;
+                }
                 UART_Read((void*)myData.ml.input, sizeof(myData.ml.input)); //Wait for data input
                 UART_Read(&a, 1); //get output class
             } else {
@@ -61,6 +67,7 @@ int main(void)
                Graphics_drawString(&ctx, "processing...", 20, 10, 20, true);
                feature_extraction(myData.rec, myData.ml.input);
             }
+
             myData.ml.target[0] = 0;
             myData.ml.target[1] = 0;
             myData.ml.target[2] = 0;
@@ -92,6 +99,8 @@ int main(void)
                 micSample(myData.rec);
                 Graphics_drawString(&ctx, "processing...", 20, 10, 20, true);
                 feature_extraction(myData.rec, myData.ml.input);
+                const char tmp = DATA_READY;
+                UART_Write((void*)tmp, 1); //send ready message
                 UART_Write((void*)myData.ml.input, sizeof(myData.ml.input));
                 UART_Write((void*)a, 1); //send class
                 Graphics_drawString(&ctx, "DONE......", 20, 10, 20, true);
@@ -99,7 +108,6 @@ int main(void)
             break;
         }
     }
-
 }
 
 const eUSCI_UART_ConfigV1 UART0Config =
@@ -158,7 +166,7 @@ void init(){
     CS_setDCOCenteredFrequency(CS_DCO_FREQUENCY_48);
     CS_initClockSignal(CS_MCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1);
     CS_initClockSignal(CS_HSMCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1);
-    CS_initClockSignal(CS_SMCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_2);
+    CS_initClockSignal(CS_SMCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1);
     CS_initClockSignal(CS_ACLK, CS_REFOCLK_SELECT, CS_CLOCK_DIVIDER_1);
 
 

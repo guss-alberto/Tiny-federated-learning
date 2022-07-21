@@ -3,8 +3,6 @@
 
 #include "includes.h"
 
-#define NODES_L0 MFCC_COEFF*NUM_FRAMES
-
 uint16_t num_epochs = 0;
 float LearningRate = 0.3;
 float Momentum = 0.9;
@@ -68,7 +66,7 @@ void eval (float *input, float *out){
 }
 
 float learn (float *input, float *out, float *target){
-   float hiddenLayer[NODES_L1], temp, error;
+   float hiddenLayer[NODES_L1], temp, error=0;
    float delta_L1[NODES_L1];
    float delta_L2[NODES_L2];
 
