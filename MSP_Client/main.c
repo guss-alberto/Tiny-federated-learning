@@ -6,10 +6,10 @@
 
 void init();
 uint8_t buttons();
+void simple_train(uint8_t class);
 
 
-
-uint8_t mode = MODE_EVAL;
+uint8_t mode = MODE_RECORD;
 
 union { //use union to save memory
     int16_t rec[NUM_SAMPLES];
@@ -25,14 +25,14 @@ int main(void)
 {
     init();
     uint8_t a;
-    Graphics_drawString(&ctx, (int8_t*)modeStr[(mode&MODE_S) - 1], 20, 20, 10, true);
+    Graphics_drawString(&ctx, (int8_t*)modeStr[(mode) - 1], 20, 20, 10, true);
 
     while (1){
         if (UART_Read_nb(&a, 1)){
             switch (a){
             case FL_READY:
                 UART_Write(&a,1);   //send message back to indicate ready status
-                UART_Write((void*)&num_epochs,sizeof(num_epochs)); //send number of epochs
+                UART_Write(&num_epochs,sizeof(num_epochs)); //send number of epochs
                 sendModel();        //send NN weights
                 getModel();         //wait to receive new model
                 num_epochs=0;       //reset number of epochs to zero
@@ -40,42 +40,31 @@ int main(void)
             case CHANGE_MODE:
                 UART_Read(&mode, 1);  //update mode value
                 Graphics_clearDisplay(&ctx); //reset screen
-                Graphics_drawString(&ctx, (int8_t*)modeStr[(mode&MODE_S) - 1], 20, 20, 10, true);
+                Graphics_drawString(&ctx, (int8_t*)modeStr[(mode) - 1], 20, 20, 10, true);
+                break;
+            case RECEIVE_TRAINING:
+                a = REQUEST_TRAINING_DATA;
+                UART_Write(&a,1);   //send request for training data
+                Graphics_drawString(&ctx, "using serial data", 20, 20, 20, true);
+                UART_Read(myData.ml.input, sizeof(myData.ml.input)); //Wait for data input
+                UART_Read(&a, 1); //get output class
+
+                simple_train(a);
+                UART_Write(&myData.ml.error, sizeof(float));
                 break;
             }
         }
 
-        switch (mode & MODE_S){
+        switch (mode){
         case MODE_LEARN:
-            if (mode & MODE_REMOTE_TRAIN ){
-                a=REQUEST_TRAINING_DATA;
-                UART_Write(&a,1);   //send request for training data
-                UART_Read(&a,1);    //read response before
-                if ( a != 0 ) {
-                    mode = a;
-                    Graphics_clearDisplay(&ctx); //reset screen
-                    Graphics_drawString(&ctx, (int8_t*)modeStr[(mode&MODE_S) - 1], 20, 20, 10, true);
-                    break;
-                }
-                UART_Read((void*)myData.ml.input, sizeof(myData.ml.input)); //Wait for data input
-                UART_Read(&a, 1); //get output class
-            } else {
-               a = buttons();
-               if (!a) break; // if no buttons are pushed exit and continue the loop
-               Graphics_drawString(&ctx, "sampling....     ", 20, 20, 20, true);
-               micSample(myData.rec);
-               Graphics_drawString(&ctx, "processing...", 20, 10, 20, true);
-               feature_extraction(myData.rec, myData.ml.input);
-            }
+            a = buttons();
+            if (!a) break; // if no buttons are pushed exit and continue the loop
+            Graphics_drawString(&ctx, "sampling....     ", 20, 20, 20, true);
+            micSample(myData.rec);
+            Graphics_drawString(&ctx, "processing...", 20, 10, 20, true);
+            feature_extraction(myData.rec, myData.ml.input);
 
-            myData.ml.target[0] = 0;
-            myData.ml.target[1] = 0;
-            myData.ml.target[2] = 0;
-            myData.ml.target[a-1] = 1.0; // button 1 -> {1,0,0};  button 2 -> {0,1,0};  button 3 -> {0,0,1}
-
-            myData.ml.error = learn (myData.ml.input, myData.ml.out, myData.ml.target);
-            UART_Write((void*)&myData.ml.error, sizeof(float));
-            num_epochs++;
+            simple_train(a);
             break;
         case MODE_EVAL:
             a = buttons();
@@ -100,9 +89,10 @@ int main(void)
                 Graphics_drawString(&ctx, "processing...", 20, 10, 20, true);
                 feature_extraction(myData.rec, myData.ml.input);
                 const char tmp = DATA_READY;
-                UART_Write((void*)tmp, 1); //send ready message
-                UART_Write((void*)myData.ml.input, sizeof(myData.ml.input));
-                UART_Write((void*)a, 1); //send class
+                UART_Write(&tmp, 1); //send ready message
+
+                UART_Write(myData.ml.input, sizeof(myData.ml.input));
+                UART_Write(&a, 1); //send class
                 Graphics_drawString(&ctx, "DONE......", 20, 10, 20, true);
             }
             break;
@@ -110,17 +100,39 @@ int main(void)
     }
 }
 
+
+void simple_train(uint8_t class){
+    myData.ml.target[0] = 0;
+    myData.ml.target[1] = 0;
+    myData.ml.target[2] = 0;
+    myData.ml.target[class-1] = 1.0; // button 1 -> {1,0,0};  button 2 -> {0,1,0};  button 3 -> {0,0,1}
+
+    myData.ml.error = learn (myData.ml.input, myData.ml.out, myData.ml.target); //train
+
+    char str[30];
+    sprintf(str, "%.2f | %.2f | %.2f", myData.ml.out[0], myData.ml.out[1], myData.ml.out[2]);
+
+    Graphics_drawString(&ctx, "DONE......", 20, 10, 20, true);
+    Graphics_drawString(&ctx, (int8_t*)str, 30, 10, 30, true);
+    sprintf(str, "ERR: %.2f", myData.ml.error);
+    Graphics_drawString(&ctx, (int8_t*)str, 30, 10, 40, true);
+
+    num_epochs++;
+}
+
+
 const eUSCI_UART_ConfigV1 UART0Config =
 {
      EUSCI_A_UART_CLOCKSOURCE_SMCLK,
      13,
      0,
-     37,
+     27,
      EUSCI_A_UART_NO_PARITY,
      EUSCI_A_UART_LSB_FIRST,
      EUSCI_A_UART_ONE_STOP_BIT,
      EUSCI_A_UART_MODE,
-     EUSCI_A_UART_OVERSAMPLING_BAUDRATE_GENERATION
+     EUSCI_A_UART_OVERSAMPLING_BAUDRATE_GENERATION,
+     EUSCI_A_UART_8_BIT_LEN
 };
 
 uint8_t buttons (){

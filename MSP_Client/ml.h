@@ -30,7 +30,7 @@ void ml_init(){
     uint16_t i, j;
     for (i=0; i<NODES_L1; i++){
         for (j=0; j<=NODES_L0; j++){
-            weights_L1[0][j] = (2.0*(float)rand()/RAND_MAX)-1.0;
+            weights_L1[i][j] = (2.0*(float)rand()/RAND_MAX)-1.0;
             change_L1[i][j] = 0;
         }
     }
@@ -91,20 +91,20 @@ float learn (float *input, float *out, float *target){
 
        //compute delta for final layer and error
        delta_L2[i] = (target[i] - out[i]) * out[i] * (1.0 - out[i]);
-       error += (1/NODES_L2) * (target[i] - out[i]) * (target[i] - out[i]);
+       error += (target[i] - out[i]) * (target[i] - out[i]);
    }
 
    //backpropagation of errors
    for(i=0; i < NODES_L1; i++) {
        temp = 0;
        for(j=0; j < NODES_L2; j++) {
-           temp += weights_L2[i][j+1]*delta_L2[j] ;
+           temp += weights_L2[j][i+1]*delta_L2[j] ;
        }
        delta_L1[i] = temp * hiddenLayer[i] * (1.0 - hiddenLayer[i]) ;
    }
 
 
-   //update hidden weigfhts
+   //update hidden weights
    for(i=0; i < NODES_L1; i++) {
        change_L1[i][0] = LearningRate * delta_L1[i] + Momentum * change_L1[i][0];
        weights_L1[i][0] += change_L1[i][0];
@@ -124,7 +124,7 @@ float learn (float *input, float *out, float *target){
            weights_L2[i][j+1] += change_L2[i][j+1] ;
        }
    }
-   return error;
+   return error/NODES_L2;
 }
 
 

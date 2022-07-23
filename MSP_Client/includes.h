@@ -32,13 +32,12 @@ Graphics_Context ctx;
 #define FL_SEND_DATA 0x02
 #define REQUEST_TRAINING_DATA 0x03
 #define DATA_READY 0x04
+#define RECEIVE_TRAINING 0x05
 #define CHANGE_MODE 0xff
 
-#define MODE_S 0b00000011
 #define MODE_LEARN  0x01
 #define MODE_EVAL   0x02
 #define MODE_RECORD 0x03
-#define MODE_REMOTE_TRAIN 0b00000100
 
 const int8_t *modeStr[] = {"Training mode",
                            "Evaluating mode",

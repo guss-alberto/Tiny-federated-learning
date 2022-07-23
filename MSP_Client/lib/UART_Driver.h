@@ -10,9 +10,9 @@
 #define UARTA0_BUFFERSIZE 128
 
 void UART_Init(uint32_t UART, eUSCI_UART_ConfigV1 UARTConfig);
-void UART_Write(uint8_t *Data, uint32_t Size);
-void UART_Read(uint8_t *Data, uint32_t Size);
-uint32_t UART_Read_nb(uint8_t *Data, uint32_t Size); //non blocking, returns the number of bytes read
+void UART_Write(const void *Data, uint32_t Size);
+void UART_Read(const void *Data, uint32_t Size);
+uint32_t UART_Read_nb(const void *Data, uint32_t Size); //non blocking, returns the number of bytes read
 
 
 #endif /* HARDWARE_UART_DRIVER_H_ */

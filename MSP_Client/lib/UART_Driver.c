@@ -18,16 +18,16 @@ void UART_Init(uint32_t UART, eUSCI_UART_ConfigV1 UARTConfig){
     MAP_Interrupt_enableInterrupt(INT_EUSCIA0);
 }
 
-void UART_Write(uint8_t *Data, uint32_t Size)
+void UART_Write(const void *Data, uint32_t Size)
 {
     uint32_t i;
     for(i = 0; i < Size; i++)
     {
-        MAP_UART_transmitData(EUSCI_A0_BASE, Data[i]);
+        UART_transmitData(EUSCI_A0_BASE, ((int8_t*)Data)[i]);
     }
 }
 
-void UART_Read(uint8_t *Data, uint32_t Size)
+void UART_Read(const void *Data, uint32_t Size)
 {
     uint32_t i;
     int8_t c;
@@ -38,12 +38,12 @@ void UART_Read(uint8_t *Data, uint32_t Size)
         c = UARTA0Data[UARTA0ReadIndex];
         UARTA0_ADVANCE_READ_INDEX;
 
-        Data[i] = c;
+        ((int8_t*)Data)[i] = c;
     }
 }
 
 //non blocking, returns the number of bytes read
-uint32_t UART_Read_nb(uint8_t *Data, uint32_t Size)
+uint32_t UART_Read_nb(const void *Data, uint32_t Size)
 {
     uint32_t i;
     int8_t c;
@@ -56,7 +56,7 @@ uint32_t UART_Read_nb(uint8_t *Data, uint32_t Size)
         c = UARTA0Data[UARTA0ReadIndex];
         UARTA0_ADVANCE_READ_INDEX;
 
-        Data[i] = c;
+        ((int8_t*)Data)[i] = c;
     }
     return i;
 }
@@ -70,12 +70,9 @@ void EUSCIA0_IRQHandler(void)
 
     if(status & EUSCI_A_UART_RECEIVE_INTERRUPT_FLAG)
     {
-        c = MAP_UART_receiveData(EUSCI_A0_BASE);
+        c = UART_receiveData(EUSCI_A0_BASE);
         UARTA0Data[UARTA0WriteIndex] = c;
         UARTA0_ADVANCE_WRITE_INDEX;
-
-        /*Transmit data only if it made it to the buffer*/
-        MAP_UART_transmitData(EUSCI_A0_BASE, c);
     }
 }
 
