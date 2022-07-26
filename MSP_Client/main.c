@@ -8,8 +8,9 @@ void init();
 uint8_t buttons();
 void simple_train(uint8_t class);
 
+#define REC_DELAY 200000
 
-uint8_t mode = MODE_RECORD;
+uint8_t mode = MODE_LEARN;
 
 union { //use union to save memory
     int16_t rec[NUM_SAMPLES];
@@ -25,8 +26,8 @@ int main(void)
 {
     init();
     uint8_t a;
+    uint32_t i;
     Graphics_drawString(&ctx, (int8_t*)modeStr[(mode) - 1], 20, 20, 10, true);
-
     while (1){
         if (UART_Read_nb(&a, 1)){
             switch (a){
@@ -45,9 +46,12 @@ int main(void)
             case RECEIVE_TRAINING:
                 a = REQUEST_TRAINING_DATA;
                 UART_Write(&a,1);   //send request for training data
-                Graphics_drawString(&ctx, "using serial data", 20, 20, 20, true);
+                //Graphics_drawString(&ctx, "using serial data", 20, 20, 20, true);
                 UART_Read(myData.ml.input, sizeof(myData.ml.input)); //Wait for data input
                 UART_Read(&a, 1); //get output class
+
+                UART_Write(myData.ml.input, sizeof(myData.ml.input));
+
 
                 simple_train(a);
                 UART_Write(&myData.ml.error, sizeof(float));
@@ -59,7 +63,8 @@ int main(void)
         case MODE_LEARN:
             a = buttons();
             if (!a) break; // if no buttons are pushed exit and continue the loop
-            Graphics_drawString(&ctx, "sampling....     ", 20, 20, 20, true);
+            for (i=0; i<REC_DELAY; i++);
+            Graphics_drawString(&ctx, "sampling.....", 20, 20, 20, true);
             micSample(myData.rec);
             Graphics_drawString(&ctx, "processing...", 20, 10, 20, true);
             feature_extraction(myData.rec, myData.ml.input);
@@ -69,7 +74,8 @@ int main(void)
         case MODE_EVAL:
             a = buttons();
             if (!a) break; // if no buttons are pushed exit and continue the loop
-            Graphics_drawString(&ctx, "sampling....     ", 20, 10, 20, true);
+            for (i=0; i<REC_DELAY; i++);
+            Graphics_drawString(&ctx, "sampling.....", 20, 10, 20, true);
             micSample(myData.rec);
             Graphics_drawString(&ctx, "processing...", 20, 10, 20, true);
             feature_extraction(myData.rec, myData.ml.input);
@@ -78,13 +84,14 @@ int main(void)
             char str[30];
             sprintf(str, "%.2f | %.2f | %.2f", myData.ml.out[0], myData.ml.out[1], myData.ml.out[2]);
 
-            Graphics_drawString(&ctx, "DONE......", 20, 10, 20, true);
+            Graphics_drawString(&ctx, "DONE!........", 20, 10, 20, true);
             Graphics_drawString(&ctx, (int8_t*)str, 30, 10, 30, true);
             break;
         case MODE_RECORD:
             a=buttons();
             if (a){
-                Graphics_drawString(&ctx, "sampling....     ", 20, 10, 20, true);
+                for (i=0; i<REC_DELAY; i++);
+                Graphics_drawString(&ctx, "sampling.....", 20, 10, 20, true);
                 micSample(myData.rec);
                 Graphics_drawString(&ctx, "processing...", 20, 10, 20, true);
                 feature_extraction(myData.rec, myData.ml.input);
@@ -93,7 +100,7 @@ int main(void)
 
                 UART_Write(myData.ml.input, sizeof(myData.ml.input));
                 UART_Write(&a, 1); //send class
-                Graphics_drawString(&ctx, "DONE......", 20, 10, 20, true);
+                Graphics_drawString(&ctx, "DONE!........", 20, 10, 20, true);
             }
             break;
         }
@@ -112,7 +119,7 @@ void simple_train(uint8_t class){
     char str[30];
     sprintf(str, "%.2f | %.2f | %.2f", myData.ml.out[0], myData.ml.out[1], myData.ml.out[2]);
 
-    Graphics_drawString(&ctx, "DONE......", 20, 10, 20, true);
+    Graphics_drawString(&ctx, "DONE!........", 20, 10, 20, true);
     Graphics_drawString(&ctx, (int8_t*)str, 30, 10, 30, true);
     sprintf(str, "ERR: %.2f", myData.ml.error);
     Graphics_drawString(&ctx, (int8_t*)str, 30, 10, 40, true);
@@ -139,17 +146,17 @@ uint8_t buttons (){
     uint8_t a = 0;
     if (!GPIO_getInputPinValue(GPIO_PORT_P3,GPIO_PIN5)&&!a){ //A
         a = 1;
-        Graphics_drawString(&ctx, "Release to record", 20, 10, 20, true);
+        Graphics_drawString(&ctx, "release btn", 20, 10, 20, true);
         while(!GPIO_getInputPinValue(GPIO_PORT_P3,GPIO_PIN5));
     }
     if (!GPIO_getInputPinValue(GPIO_PORT_P5,GPIO_PIN1)&&!a){ //B
         a = 2;
-        Graphics_drawString(&ctx, "Release to record", 20, 10, 20, true);
+        Graphics_drawString(&ctx, "release btn", 20, 10, 20, true);
         while(!GPIO_getInputPinValue(GPIO_PORT_P5,GPIO_PIN1));
     }
     if (!GPIO_getInputPinValue(GPIO_PORT_P4,GPIO_PIN1)&&!a){ //J
         a = 3;
-        Graphics_drawString(&ctx, "Release to record", 20, 10, 20, true);
+        Graphics_drawString(&ctx, "release btn", 20, 10, 20, true);
         while (!GPIO_getInputPinValue(GPIO_PORT_P4,GPIO_PIN1));
     }
     return a;

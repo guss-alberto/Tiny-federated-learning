@@ -129,13 +129,13 @@ float learn (float *input, float *out, float *target){
 
 
 void sendModel (){
-    UART_Write((void*)weights_L1, sizeof(weights_L1));
-    UART_Write((void*)weights_L2, sizeof(weights_L2));
+    UART_Write(weights_L1, sizeof(weights_L1));
+    UART_Write(weights_L2, sizeof(weights_L2));
 }
 
 void getModel (){
-    UART_Read((void*)weights_L1, sizeof(weights_L1));
-    UART_Read((void*)weights_L2, sizeof(weights_L2));
+    UART_Read(weights_L1, sizeof(weights_L1));
+    UART_Read(weights_L2, sizeof(weights_L2));
 }
 
 #endif

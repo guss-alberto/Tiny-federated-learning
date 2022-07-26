@@ -29,8 +29,8 @@ PORT = 'COM4'
 
 FL_READY =          b"\x01"
 FL_SEND_DATA =      b"\x02"
-FL_REQUEST_DATA =   b"\x03"
-FL_CHANGE_MODE =    b"\xff"
+REQUEST_TRAINING_DATA =   b"\x03"
+CHANGE_MODE =    b"\xff"
 
 MODE_LEARN =        b"\x01"
 MODE_EVAL =         b"\x02"
@@ -42,22 +42,25 @@ RECEIVE_TRAINING =  b"\x05"
 
 nn_weights = []
 num_epoch = 0
-
+sent = False
 num_dataset = 0
 
 def import_dataset (path):
-    f = open(path, "rb")
     data = []
-    while d := f.read(NODES_L0*4+1):
-        data.append(d)
+    with open(path, "rb") as file:
+        while d := file.read(NODES_L0*4+1):
+            data.append(d)
     random.shuffle(data)
     return data
+    
 
 if __name__ == "__main__":
     ser = serial.Serial(PORT, baudrate=BAUDRATE, bytesize=8, stopbits=serial.STOPBITS_ONE)
-    ser.write(b"\xff"+MODE_LEARN)  #set mode to training
-    recording_file = open(RECODING_DATASET_FILE, "ab")
+    mode = MODE_LEARN
+    ser.write(b"\xff"+mode) 
+
     colors_dataset = import_dataset(TRAINING_DATASET_FILE)
+    recording_file = open(RECODING_DATASET_FILE, "ab")
     while True:
         if (ser.in_waiting):
             a = ser.read()
@@ -71,26 +74,32 @@ if __name__ == "__main__":
                 ########### DO STUFF ###########
                 buf = struct.pack('%sf' % NN_SIZE, *nn_weights) #send new weights back to device
                 ser.write(buf)
-            elif ( a == FL_REQUEST_DATA ):
-                ser.write(b"\x00") 
+            elif ( a == REQUEST_TRAINING_DATA ):
                 ser.write(colors_dataset[num_dataset])  #send data
-                print (struct.unpack("%sfc" % NODES_L0,colors_dataset[num_dataset]))
+                res = ser.read(NODES_L0*4)
+
                 data = ser.read(4)
                 [temp] = struct.unpack("f",data)
                 num_dataset += 1
                 print(num_dataset)
                 print(temp) #read error
+                sent = False
 
             elif ( a == DATA_READY ):
                 data = ser.read(NODES_L0*4+1)
+                #print(struct.unpack("%sfc" % NODES_L0, data))
                 recording_file.write(data)
                 print(num_dataset)
                 num_dataset += 1
-        else:
-            if (num_dataset<len(colors_dataset)):
+        elif mode == MODE_LEARN:
+            if num_dataset<len(colors_dataset) and not sent:
+                time.sleep(.1)
                 ser.write(RECEIVE_TRAINING)
+                sent = True
             elif (num_dataset == len(colors_dataset)):
-                ser.write(b"\xff"+MODE_EVAL)
+                print("done")
+                mode=MODE_EVAL
+                ser.write(b"\xff"+mode)
                 num_dataset+=1
 
 
