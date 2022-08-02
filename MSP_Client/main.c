@@ -28,6 +28,7 @@ int main(void)
     uint8_t a;
     uint32_t i;
     Graphics_drawString(&ctx, (int8_t*)modeStr[(mode) - 1], 20, 20, 10, true);
+    srand(RANDOM_SEED);
     while (1){
         if (UART_Read_nb(&a, 1)){
             switch (a){

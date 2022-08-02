@@ -13,6 +13,7 @@
 
 Graphics_Context ctx;
 
+#define RANDOM_SEED 17762
 
 #define SAMPLE_FREQUENCY 8000
 #define SMCLK_FREQUENCY  48000000
