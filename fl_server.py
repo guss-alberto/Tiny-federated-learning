@@ -78,6 +78,7 @@ def startFL (id, ser, dataset, new_weights, devices_weights):
                 data = ser.read(4)
                 [error] = struct.unpack("f",data)
                 print("Device %s, round %s, Err: %s"%(id,round,error))
+                #errors[id][count]=error
                 round += 1
                 sent = False
 
@@ -88,35 +89,32 @@ def startFL (id, ser, dataset, new_weights, devices_weights):
                 print(id, round)
                 round += 1
         elif mode == MODE_LEARN:
-            if round<len(dataset) and not sent:
+            if not sent:
                 time.sleep(.1)
-                if (count < TRAINING_ROUNDS_BEFORE_FL):
+                if (count < len(dataset)):
                     ser.write(RECEIVE_TRAINING)
                 else:
                     ser.write(FL_READY)
                     print("Device %s start FL"%(id))
                 sent = True
                 count += 1
-            elif (round == len(dataset)):
-                print("done")
-                mode=MODE_EVAL
-                ser.write(b"\xff"+mode)
-                round+=1
-                ser.write(FL_READY)
 
 if __name__ == "__main__":
     dataset = import_dataset(TRAINING_DATASET_FILE)
     recording_file = open(RECODING_DATASET_FILE, "ab")
     
     devices = [] 
-
+    
+    print("%s training samples"%len(dataset))
 
     for port in device_ports:
         devices.append(serial.Serial(port, baudrate=BAUDRATE, bytesize=8, stopbits=serial.STOPBITS_ONE))
     round = 0
     new_weights = []
+    
     while True:
         devices_weights = np.empty((len(device_ports), NN_SIZE), dtype='float32')
+        #devices_ERRORS = np.empty((len(device_ports), TRAINING_ROUNDS_BEFORE_FL), dtype='float32')
         threads = []
         print("Round %s"%round)
         
@@ -140,6 +138,8 @@ if __name__ == "__main__":
     buf = struct.pack('%sf' % NN_SIZE, *new_weights) #send new weights back to device
     for device in devices:
         device.write(buf)
+        device.write(b"\xff"+MODE_EVAL)
+
     print ("Done")
 
 

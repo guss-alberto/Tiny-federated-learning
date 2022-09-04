@@ -27,6 +27,8 @@ int main(void)
     init();
     uint8_t a;
     uint32_t i;
+
+#ifndef RECORD_ONLY_MODE
     Graphics_drawString(&ctx, (int8_t*)modeStr[(mode) - 1], 20, 20, 10, true);
     srand(RANDOM_SEED);
     while (1){
@@ -106,6 +108,25 @@ int main(void)
             break;
         }
     }
+#else
+   Graphics_drawString(&ctx, "RAW RECORDING", 20, 20, 10, true);
+   while (1){
+       a=buttons();
+       if (a){
+           for (i=0; i<REC_DELAY; i++);
+           Graphics_drawString(&ctx, "sampling...", 20, 10, 20, true);
+           micSample(myData.rec);
+           const char tmp = RAW_DATA_READY;
+           Graphics_drawString(&ctx, "sending....", 20, 10, 20, true);
+           UART_Write(&tmp, 1); //send ready message
+           UART_Write(myData.rec, sizeof(myData.rec));
+           UART_Write(&a, 1); //send class
+           Graphics_drawString(&ctx, "DONE!......", 20, 10, 20, true);
+       }
+       break;
+   }
+#endif
+
 }
 
 

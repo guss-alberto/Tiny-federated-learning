@@ -13,6 +13,9 @@
 
 Graphics_Context ctx;
 
+#define RECORD_ONLY_MODE
+
+
 #define RANDOM_SEED 17762
 
 #define SAMPLE_FREQUENCY 8000
@@ -34,6 +37,7 @@ Graphics_Context ctx;
 #define REQUEST_TRAINING_DATA 0x03
 #define DATA_READY 0x04
 #define RECEIVE_TRAINING 0x05
+#define RAW_DATA_READY 0x06
 #define CHANGE_MODE 0xff
 
 #define MODE_LEARN  0x01
