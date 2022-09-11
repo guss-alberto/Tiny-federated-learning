@@ -123,7 +123,6 @@ int main(void)
            UART_Write(&a, 1); //send class
            Graphics_drawString(&ctx, "DONE!......", 20, 10, 20, true);
        }
-       break;
    }
 #endif
 
