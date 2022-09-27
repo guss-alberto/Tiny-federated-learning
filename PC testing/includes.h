@@ -1,29 +1,32 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <math.h> 
 
 #ifndef __INCLUDES_H__
 #define __INCLUDES_H__
 
-Graphics_Context ctx;
 
 #define RECORD_ONLY_MODE
 
+#define LEARNINGRATE 0.5
+#define LEARNINGMOMENTUM 0
 
 #define RANDOM_SEED 17762
 
-#define SAMPLE_FREQUENCY 8000
+#define SAMPLE_FREQUENCY 16000
 #define SMCLK_FREQUENCY  48000000
 
-#define NUM_MEL_BANDS 22
-#define MFCC_COEFF  9
-#define NUM_FRAMES  28
-#define FFT_WINDOW 256
+#define NUM_MEL_BANDS 32
+#define MFCC_COEFF  13
+#define NUM_FRAMES  24
+#define FFT_WINDOW 320
 
 #define NUM_SAMPLES FFT_WINDOW*NUM_FRAMES
 
 #define NODES_L0 MFCC_COEFF*NUM_FRAMES
-#define NODES_L1 24
-#define NODES_L2 3
+#define NODES_L1 25
+#define NODES_L2 2
 
 #define FL_READY     0x01
 #define FL_SEND_DATA 0x02

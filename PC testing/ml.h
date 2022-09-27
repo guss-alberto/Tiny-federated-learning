@@ -4,8 +4,8 @@
 #include "includes.h"
 
 uint16_t num_epochs = 0;
-float LearningRate = 0.3;
-float Momentum = 0.9;
+float LearningRate = LEARNINGRATE;
+float Momentum = LEARNINGMOMENTUM;
 
 float weights_L1[NODES_L1][NODES_L0+1];
 float change_L1 [NODES_L1][NODES_L0+1];
@@ -22,9 +22,6 @@ void eval (float *input, float *out);
 //backpropagates error and updates, return value is error
 float learn (float *input, float *out, float *target);
 
-//sends or get the model data over UART
-void sendModel ();
-void getModel ();
 
 void ml_init(){
     uint16_t i, j;
@@ -127,15 +124,5 @@ float learn (float *input, float *out, float *target){
    return error/NODES_L2;
 }
 
-
-void sendModel (){
-    UART_Write(weights_L1, sizeof(weights_L1));
-    UART_Write(weights_L2, sizeof(weights_L2));
-}
-
-void getModel (){
-    UART_Read(weights_L1, sizeof(weights_L1));
-    UART_Read(weights_L2, sizeof(weights_L2));
-}
 
 #endif

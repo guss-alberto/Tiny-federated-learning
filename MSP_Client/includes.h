@@ -18,7 +18,7 @@ Graphics_Context ctx;
 
 #define RANDOM_SEED 17762
 
-#define SAMPLE_FREQUENCY 8000
+#define SAMPLE_FREQUENCY 16000
 #define SMCLK_FREQUENCY  48000000
 
 #define NUM_MEL_BANDS 22
