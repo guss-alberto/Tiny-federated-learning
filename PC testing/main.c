@@ -1,5 +1,5 @@
 #include "includes.h"
-#include "feature_extraction.h"
+//#include "feature_extraction.h"
 #include "ml.h"
 
 void simple_train(uint8_t class);
@@ -18,7 +18,7 @@ union { //use union to save memory
 int main(void)
 {
     srand(RANDOM_SEED);
-    FILE* recfile =  fopen("../datasets/raw_color_rando.dat","rb");
+    FILE* recfile =  fopen("../datasets/mfcc_mountains.dat","rb");
     if (!recfile){
         fprintf(stderr, "ERROR, Couldn't open file");
         return 1;
@@ -28,9 +28,13 @@ int main(void)
 
     ml_init();
     while (!feof(recfile)){
-        fread(myData.rec, FFT_WINDOW*NUM_FRAMES*2, 1, recfile); //read recording
+        #ifndef READ_PROCESSED
+            fread(myData.rec, FFT_WINDOW*NUM_FRAMES, 2, recfile); //read recording
+            feature_extraction(myData.rec, myData.ml.input);
+        #else
+            fread(myData.ml.input, NODES_L0, 4, recfile); //read recording
+        #endif
         fread(&a, 1, 1, recfile); //read class
-        feature_extraction(myData.rec, myData.ml.input);
         simple_train(a);
     }
 }

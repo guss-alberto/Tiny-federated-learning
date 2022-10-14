@@ -6,10 +6,11 @@
 #ifndef __INCLUDES_H__
 #define __INCLUDES_H__
 
+#define READ_PROCESSED
 
 #define RECORD_ONLY_MODE
 
-#define LEARNINGRATE 0.5
+#define LEARNINGRATE 0.6
 #define LEARNINGMOMENTUM 0
 
 #define RANDOM_SEED 17762
@@ -19,14 +20,14 @@
 
 #define NUM_MEL_BANDS 32
 #define MFCC_COEFF  13
-#define NUM_FRAMES  24
+#define NUM_FRAMES  49
 #define FFT_WINDOW 320
 
 #define NUM_SAMPLES FFT_WINDOW*NUM_FRAMES
 
 #define NODES_L0 MFCC_COEFF*NUM_FRAMES
 #define NODES_L1 25
-#define NODES_L2 2
+#define NODES_L2 3
 
 #define FL_READY     0x01
 #define FL_SEND_DATA 0x02
