@@ -2,7 +2,7 @@
 //#include "feature_extraction.h"
 #include "ml.h"
 
-void simple_train(uint8_t class);
+void simple_train(uint8_t class, bool mode);
 
 
 union { //use union to save memory
@@ -15,18 +15,35 @@ union { //use union to save memory
     } ml;
 } myData;
 
-int main(void)
-{
+int main(int argc, char **argv){
     srand(RANDOM_SEED);
-    FILE* recfile =  fopen("../datasets/mfcc_mountains.dat","rb");
+
+    if (argc!=5){
+        fprintf(stderr, "ERROR, Invalid number of parameters%d",argc);
+        return 2;
+    }
+
+
+    FILE* recfile =  fopen(argv[1],"rb");
     if (!recfile){
         fprintf(stderr, "ERROR, Couldn't open file");
         return 1;
     }
-    uint8_t a;
-    uint32_t i;
 
-    ml_init();
+    FILE* weightsfile =  fopen(argv[2],"rb");
+    if (weightsfile){
+        printf("Weights loaded\n");
+        getModel(weightsfile);
+        fclose(weightsfile);
+    } else {
+        ml_init();
+    }
+    bool mode = (argv[4][0]=='T');
+    if (mode){
+        printf("Testing mode\n");
+    }
+    uint8_t a;
+
     while (!feof(recfile)){
         #ifndef READ_PROCESSED
             fread(myData.rec, FFT_WINDOW*NUM_FRAMES, 2, recfile); //read recording
@@ -35,24 +52,34 @@ int main(void)
             fread(myData.ml.input, NODES_L0, 4, recfile); //read recording
         #endif
         fread(&a, 1, 1, recfile); //read class
-        simple_train(a);
+        simple_train(a, mode);
+
     }
+
+    weightsfile =  fopen(argv[3],"wb");
+    if (!weightsfile){
+        fprintf(stderr, "ERROR, Couldn't open file");
+        return 1;
+    }
+    sendModel(weightsfile);
 }
 
 
-void simple_train(uint8_t class){
+void simple_train(uint8_t class, bool mode){
     myData.ml.target[0] = 0;
     myData.ml.target[1] = 0;
     myData.ml.target[2] = 0;
     myData.ml.target[class-1] = 1.0; // button 1 -> {1,0,0};  button 2 -> {0,1,0};  button 3 -> {0,0,1}
 
-    myData.ml.error = learn (myData.ml.input, myData.ml.out, myData.ml.target); //train
-
-    printf("%.2f | %.2f | %.2f, error: %.5f, target %d, %d\n", myData.ml.out[0], myData.ml.out[1], myData.ml.out[2], myData.ml.error, class, num_epochs);
+    if (mode)
+        myData.ml.error = learn (myData.ml.input, myData.ml.out, myData.ml.target); //train
+    else
+        myData.ml.error = eval (myData.ml.input, myData.ml.out, myData.ml.target); //train
+    
+    printf("%.2f | %.2f | %.2f, %.5f, %d, %d\n", myData.ml.out[0], myData.ml.out[1], myData.ml.out[2], myData.ml.error, class, num_epochs);
 
     num_epochs++;
 }
-
 
 
 

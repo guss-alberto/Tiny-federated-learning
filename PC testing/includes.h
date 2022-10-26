@@ -2,13 +2,13 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <math.h> 
+#include <stdbool.h> 
 
 #ifndef __INCLUDES_H__
 #define __INCLUDES_H__
 
 #define READ_PROCESSED
 
-#define RECORD_ONLY_MODE
 
 #define LEARNINGRATE 0.6
 #define LEARNINGMOMENTUM 0
