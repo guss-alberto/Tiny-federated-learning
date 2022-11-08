@@ -3,7 +3,6 @@
 
 #include "includes.h"
 #include "lib/fft.h"
-#include "lib/libmfcc.h"
 
 void feature_extraction (int16_t *s, float *out){
     uint32_t i, j, k;
@@ -35,7 +34,7 @@ void feature_extraction (int16_t *s, float *out){
 
     
        //convert to log frequency scale
-       /*float mel[NUM_MEL_BANDS];
+       float mel[NUM_MEL_BANDS];
        int16_t prev_band = 0;
        int16_t curr_band = 1;
        int16_t next_band = 3;
@@ -62,10 +61,7 @@ void feature_extraction (int16_t *s, float *out){
              sum += s * mel[j] * cos(M_PI * (j + .5) * k / NUM_MEL_BANDS);
            }
            out[k+MFCC_COEFF*i] =  1.0 / (1.0 + exp(-sum * sqrt(2.0 / NUM_MEL_BANDS)));
-         }*/
-        for (j=0; j<MFCC_COEFF; j++){
-            out[MFCC_COEFF*i+j] = GetCoefficient(temp_data.real, SAMPLE_FREQUENCY ,NUM_MEL_BANDS, FFT_WINDOW, j);
-        }
+         }
 
     }
 }

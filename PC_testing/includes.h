@@ -20,8 +20,8 @@
 
 #define NUM_MEL_BANDS 32
 #define MFCC_COEFF  13
-#define NUM_FRAMES  49
-#define FFT_WINDOW 320
+#define NUM_FRAMES  29
+#define FFT_WINDOW 256
 
 #define NUM_SAMPLES FFT_WINDOW*NUM_FRAMES
 

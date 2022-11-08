@@ -141,4 +141,14 @@ void getModel (FILE* f){
     fread(weights_L2, sizeof(weights_L2), 1, f);
 }
 
+void sendDir (FILE* f){
+    fwrite(change_L1, sizeof(weights_L1), 1, f);
+    fwrite(change_L2, sizeof(weights_L2), 1, f);
+}
+
+void getDir (FILE* f){
+    fread(change_L1, sizeof(weights_L1), 1, f);
+    fread(change_L2, sizeof(weights_L2), 1, f);
+}
+
 #endif

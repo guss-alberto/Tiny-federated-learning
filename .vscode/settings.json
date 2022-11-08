@@ -3,6 +3,8 @@
         "includes.h": "c",
         "stdio.h": "c",
         "math.h": "c",
-        "stdbool.h": "c"
+        "stdbool.h": "c",
+        "ml.h": "c",
+        "feature_extraction.h": "c"
     }
 }
