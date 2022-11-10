@@ -7,7 +7,7 @@
 #ifndef __INCLUDES_H__
 #define __INCLUDES_H__
 
-#define READ_PROCESSED
+//#define READ_PROCESSED
 
 
 #define LEARNINGRATE 0.6
@@ -18,31 +18,24 @@
 #define SAMPLE_FREQUENCY 16000
 #define SMCLK_FREQUENCY  48000000
 
+
+#define HIGH_FREQ  SAMPLE_FREQUENCY/2.0f 
+#define LOW_FREQ   300.0f
+
+#define PRE_COEFF 0.970f
+#define PRE_SHIFT 1
+#define FRAME_SIZE 320
+
 #define NUM_MEL_BANDS 32
 #define MFCC_COEFF  13
-#define NUM_FRAMES  29
-#define FFT_WINDOW 256
+#define NUM_FRAMES  50
+#define FFT_WINDOW 512
 
-#define NUM_SAMPLES FFT_WINDOW*NUM_FRAMES
+#define NUM_SAMPLES FRAME_SIZE*NUM_FRAMES
 
 #define NODES_L0 MFCC_COEFF*NUM_FRAMES
 #define NODES_L1 25
 #define NODES_L2 3
 
-#define FL_READY     0x01
-#define FL_SEND_DATA 0x02
-#define REQUEST_TRAINING_DATA 0x03
-#define DATA_READY 0x04
-#define RECEIVE_TRAINING 0x05
-#define RAW_DATA_READY 0x06
-#define CHANGE_MODE 0xff
-
-#define MODE_LEARN  0x01
-#define MODE_EVAL   0x02
-#define MODE_RECORD 0x03
-
-const int8_t *modeStr[] = {"Training mode",
-                           "Evaluating mode",
-                           "Data recording"};
 
 #endif

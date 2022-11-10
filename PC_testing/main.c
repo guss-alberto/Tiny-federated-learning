@@ -17,6 +17,7 @@ union { //use union to save memory
 
 int main(int argc, char **argv){
     srand(RANDOM_SEED);
+    init_mfcc();
 
     if (argc!=5){
         fprintf(stderr, "ERROR, Invalid number of parameters%d",argc);
@@ -38,7 +39,7 @@ int main(int argc, char **argv){
     } else {
         ml_init();
     }
-
+    
     /*FILE* dirfile =  fopen(argv[5],"rb");
     if (dirfile){
         printf("Direction loaded\n");
@@ -54,7 +55,7 @@ int main(int argc, char **argv){
 
     while (!feof(recfile)){
         #ifndef READ_PROCESSED
-            fread(myData.rec, FFT_WINDOW*NUM_FRAMES, 2, recfile); //read recording
+            fread(myData.rec, NUM_SAMPLES, 2, recfile); //read recording
             feature_extraction(myData.rec, myData.ml.input);
         #else
             fread(myData.ml.input, NODES_L0, 4, recfile); //read recording

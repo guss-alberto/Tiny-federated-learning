@@ -1,6 +1,5 @@
-from operator import index
-import subprocess
 
+import subprocess
 import struct
 import time
 from unittest import result
@@ -18,52 +17,57 @@ NUM_CLIENTS = 3
 FFT_WINDOW = 256
 
 MFCC_COEFF =  13
-NUM_FRAMES =  30
+NUM_FRAMES =  50
 
 TRAINING_ROUNDS_BEFORE_FL = 30
-NODES_L0 = (NUM_FRAMES-1)*MFCC_COEFF
+NODES_L0 = (NUM_FRAMES)*MFCC_COEFF
 NODES_L1 = 25
 NODES_L2 = 3
 
 NN_SIZE = NODES_L1*(NODES_L0+1) + NODES_L2*(NODES_L1+1)
-N_SAMPLES = NUM_FRAMES*FFT_WINDOW
+N_SAMPLES = 16000
 SAMPLE_RATE = 16000
-path = "../../TinyML-FederatedLearning-master/"
+path = "../../TinyML-FederatedLearning-master/datasets/"
 
-PROCESS = True
-IID = False
-TESTING = False
+PROCESS = False
+IID = True 
+TESTING = True
+FILE_SOURCE = "paper"
 
-
-
-FILE_SOURCE = "my_data"
-FRAME_LENGTH_TEST = FFT_WINDOW/SAMPLE_RATE
+FRAME_LENGTH_TEST = N_SAMPLES/(SAMPLE_RATE*NUM_FRAMES)
 
 
-montserrat_files = [file for file in os.listdir(path+"datasets/mountains") if file.startswith("montserrat")]
-pedraforca_files = [file for file in os.listdir(path+"datasets/mountains") if file.startswith("pedraforca")]
-vermell_files = [file for file in os.listdir(path+"datasets/colors") if file.startswith("vermell")]
-verd_files = [file for file in os.listdir(path+"datasets/colors") if file.startswith("verd")]
-blau_files = [file for file in os.listdir(path+"datasets/colors") if file.startswith("blau")]
-test_montserrat_files = [file for file in os.listdir(path+"datasets/test") if file.startswith("montserrat")]
-test_pedraforca_files = [file for file in os.listdir(path+"datasets/test") if file.startswith("pedraforca")]       
+if FILE_SOURCE == "paper":
+    montserrat_files = [file for file in os.listdir(path+"mountains") if file.startswith("montserrat")]
+    pedraforca_files = [file for file in os.listdir(path+"mountains") if file.startswith("pedraforca")]
+    vermell_files = [file for file in os.listdir(path+"colors") if file.startswith("vermell")]
+    verd_files = [file for file in os.listdir(path+"colors") if file.startswith("verd")]
+    blau_files = [file for file in os.listdir(path+"colors") if file.startswith("blau")]
+    test_montserrat_files = [file for file in os.listdir(path+"test") if file.startswith("montserrat")]
+    test_pedraforca_files = [file for file in os.listdir(path+"test") if file.startswith("pedraforca")]       
 
-mountains      = list(sum(zip(montserrat_files, pedraforca_files), ()))
-test_mountains = list(sum(zip(test_montserrat_files, test_pedraforca_files), ()))
+    mountains      = list(sum(zip(montserrat_files, pedraforca_files), ()))
+    test_mountains = list(sum(zip(test_montserrat_files, test_pedraforca_files), ()))
+else :
+    def load_ds (path):
+        data = []
+        with open(path, "rb") as file:
+            while d := file.read(N_SAMPLES*2+1):
+                data.append(d)
+        return data
 
-def load_ds (path):
-    data = []
-    with open(path, "rb") as file:
-        while d := file.read(N_SAMPLES*2+1):
-            data.append(d)
-    return data
+    red_data   = load_ds("../datasets/raw_colors_red.dat",)
+    green_data = load_ds("../datasets/raw_colors_green.dat")
+    blue_data  = load_ds("../datasets/raw_colors_blue.dat")
 
-red_data   = load_ds("../datasets/raw_colors_red.dat",)
-green_data = load_ds("../datasets/raw_colors_green.dat")
-blue_data  = load_ds("../datasets/raw_colors_blue.dat")
+    colors     = list(sum(zip(red_data, green_data, blue_data), ()))
 
-colors     = list(sum(zip(red_data, green_data, blue_data), ()))
 
+def feature_extraction(samples):
+    data = speechpy.processing.preemphasis(np.array(samples), shift=1, cof=0.98)
+    data = speechpy.feature.mfcc(data, SAMPLE_RATE, frame_length = FRAME_LENGTH_TEST, frame_stride = FRAME_LENGTH_TEST, num_cepstral = MFCC_COEFF, num_filters = 32, high_frequency = 0, low_frequency = 300, fft_length = 512, dc_elimination = True)
+    data = speechpy.processing.cmvnw(data, win_size=101, variance_normalization=True)
+    return data.astype('float32')
 
 def get_training(indextype):
     result = []
@@ -76,30 +80,30 @@ def get_training(indextype):
                     indextype = 1
                 elif (filename.startswith("pedraforca")):
                     indextype = 2
-                data = json.load(open(path+"datasets/mountains/"+filename))
+                data = json.load(open(path+"mountains/"+filename))
             try:
                 if indextype == 1:
-                    data = json.load(open(path+"datasets/mountains/"+montserrat_files.pop()))      
+                    data = json.load(open(path+"mountains/"+montserrat_files.pop()))      
                 elif indextype == 2:
-                    data = json.load(open(path+"datasets/mountains/"+pedraforca_files.pop()))      
+                    data = json.load(open(path+"mountains/"+pedraforca_files.pop()))      
                 elif indextype == 3:
-                    data = json.load(open(path+"datasets/colors/"   +vermell_files.pop()))      
+                    data = json.load(open(path+"colors/"   +vermell_files.pop()))      
                 elif indextype == 4:
-                    data = json.load(open(path+"datasets/colors/"   +verd_files.pop()))      
+                    data = json.load(open(path+"colors/"   +verd_files.pop()))      
                 elif indextype == 5:
-                    data = json.load(open(path+"datasets/colors/"   +blau_files.pop()))      
+                    data = json.load(open(path+"colors/"   +blau_files.pop()))      
                 elif indextype == 6:
-                    data = json.load(open(path+"datasets/test/"     +test_montserrat_files.pop()))     
+                    data = json.load(open(path+"test/"     +test_montserrat_files.pop()))     
                     indextype = 1
                 elif indextype == 7:
-                    data = json.load(open(path+"datasets/test/"     +test_pedraforca_files.pop()))  
+                    data = json.load(open(path+"test/"     +test_pedraforca_files.pop()))  
                     indextype = 2
             except Exception as e:
                 print (e)
                 continue
             samples = data["payload"]["values"] 
             if PROCESS:
-                data = speechpy.feature.mfcc(np.array(samples), SAMPLE_RATE, frame_length = 0.02, frame_stride = 0.02, num_cepstral = MFCC_COEFF, num_filters = 32, high_frequency = 0, low_frequency = 300, fft_length = 256, dc_elimination = True).astype('float32')
+                data = feature_extraction(samples)
                 result.append(data.tobytes()+struct.pack('b',indextype))
             else:
                 result.append(struct.pack('%sh' % len(samples), *samples)+struct.pack('b',indextype))
@@ -116,9 +120,7 @@ def get_training(indextype):
                     data =  blue_data.pop()     
             if PROCESS:
                 indextype = data[-1]
-                samples = struct.unpack('%sh' % N_SAMPLES, data[0:-1])
-                data = speechpy.feature.mfcc(np.array(samples), SAMPLE_RATE, frame_length = FRAME_LENGTH_TEST, frame_stride = FRAME_LENGTH_TEST, num_cepstral = MFCC_COEFF, num_filters = 32, high_frequency = 0, low_frequency = 300, fft_length = 256, dc_elimination = True).astype('float32')
-                #print(data)
+                data = feature_extraction(data[0:-1])
                 result.append(data.tobytes()+struct.pack('b',indextype))
             else:
                 result.append(data)
@@ -151,7 +153,7 @@ def get_testing ():
             indextype = 1
         elif (filename.startswith("pedraforca")):
             indextype = 2
-        data = json.load(open(path+"datasets/test/"+filename))
+        data = json.load(open(path+"test/"+filename))
         
         samples = data["payload"]["values"] 
         if PROCESS:
