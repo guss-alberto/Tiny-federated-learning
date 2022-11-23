@@ -16,10 +16,15 @@ union { //use union to save memory
 } myData;
 
 int main(int argc, char **argv){
-    srand(RANDOM_SEED);
-    init_mfcc();
 
-    if (argc!=5){
+    
+    if (argc!=
+        #ifdef USE_MOMENTUM
+            6
+        #else 
+            5
+        #endif
+        ){
         fprintf(stderr, "ERROR, Invalid number of parameters%d",argc);
         return 2;
     }
@@ -40,26 +45,38 @@ int main(int argc, char **argv){
         ml_init();
     }
     
-    /*FILE* dirfile =  fopen(argv[5],"rb");
-    if (dirfile){
-        printf("Direction loaded\n");
-        getDir(dirfile);
-        fclose(dirfile);
-    }*/
+    #ifdef USE_MOMENTUM
+    FILE* dirfile =  fopen(argv[5],"rb");
+        if (dirfile){
+            printf("Momentum loaded\n");
+            getDir(dirfile);
+            fclose(dirfile);
+        }
+    #endif
 
     bool mode = (argv[4][0]=='T');
     if (mode){
         printf("Testing mode\n");
     }
-    uint8_t a;
 
+    uint8_t a;
+    srand(RANDOM_SEED);
+    init_mfcc();
     while (!feof(recfile)){
         #ifndef READ_PROCESSED
             fread(myData.rec, NUM_SAMPLES, 2, recfile); //read recording
             feature_extraction(myData.rec, myData.ml.input);
+            
+            /*for (int i = 0; i < (NUM_FRAMES); i++){
+                for (int j = 0; j < (MFCC_COEFF); j++)
+                    printf("%f\t",myData.ml.input[i*MFCC_COEFF+j] );
+                putchar('\n');
+            }
+            return 1;*/
         #else
             fread(myData.ml.input, NODES_L0, 4, recfile); //read recording
         #endif
+        
         fread(&a, 1, 1, recfile); //read classi
         simple_train(a, mode);
 
@@ -71,12 +88,15 @@ int main(int argc, char **argv){
         return 1;
     }
     sendModel(weightsfile);
-    /*dirfile =  fopen(argv[5],"wb");
-    if (!dirfile){
-        fprintf(stderr, "ERROR, Couldn't open file");
-        return 1;
-    }
-    sendDir(dirfile);*/
+
+    #ifdef USE_MOMENTUM
+        dirfile =  fopen(argv[5],"wb");
+        if (!dirfile){
+            fprintf(stderr, "ERROR, Couldn't open file");
+            return 1;
+        }
+        sendDir(dirfile);
+    #endif
 }
 
 

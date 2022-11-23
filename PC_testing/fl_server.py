@@ -14,13 +14,13 @@ import speechpy
 
 NUM_CLIENTS = 3
 
-FFT_WINDOW = 256
+FFT_WINDOW = 512
 
 MFCC_COEFF =  13
 NUM_FRAMES =  50
 
 TRAINING_ROUNDS_BEFORE_FL = 30
-NODES_L0 = (NUM_FRAMES)*MFCC_COEFF
+NODES_L0 = NUM_FRAMES*MFCC_COEFF
 NODES_L1 = 25
 NODES_L2 = 3
 
@@ -29,12 +29,12 @@ N_SAMPLES = 16000
 SAMPLE_RATE = 16000
 path = "../../TinyML-FederatedLearning-master/datasets/"
 
-PROCESS = False
-IID = True 
+PROCESS = True
+IID = False 
 TESTING = True
 FILE_SOURCE = "paper"
 
-FRAME_LENGTH_TEST = N_SAMPLES/(SAMPLE_RATE*NUM_FRAMES)
+FRAME_LENGTH_TEST = N_SAMPLES/(SAMPLE_RATE*52)
 
 
 if FILE_SOURCE == "paper":
@@ -48,7 +48,7 @@ if FILE_SOURCE == "paper":
 
     mountains      = list(sum(zip(montserrat_files, pedraforca_files), ()))
     test_mountains = list(sum(zip(test_montserrat_files, test_pedraforca_files), ()))
-else :
+else:
     def load_ds (path):
         data = []
         with open(path, "rb") as file:
@@ -65,8 +65,14 @@ else :
 
 def feature_extraction(samples):
     data = speechpy.processing.preemphasis(np.array(samples), shift=1, cof=0.98)
-    data = speechpy.feature.mfcc(data, SAMPLE_RATE, frame_length = FRAME_LENGTH_TEST, frame_stride = FRAME_LENGTH_TEST, num_cepstral = MFCC_COEFF, num_filters = 32, high_frequency = 0, low_frequency = 300, fft_length = 512, dc_elimination = True)
+    data = speechpy.feature.mfcc(np.array(samples), SAMPLE_RATE, frame_length = FRAME_LENGTH_TEST, frame_stride = FRAME_LENGTH_TEST, num_cepstral = MFCC_COEFF, num_filters = 32, high_frequency = SAMPLE_RATE/2, low_frequency = 300, fft_length = FFT_WINDOW, dc_elimination = True)
     data = speechpy.processing.cmvnw(data, win_size=101, variance_normalization=True)
+    #for i in range(NUM_FRAMES):
+    #    line = ""
+    #    for j in range(MFCC_COEFF):
+    #        line += f"{data[i][j]:.6f}\t"
+    #    print(line)
+    #exit()
     return data.astype('float32')
 
 def get_training(indextype):
@@ -104,9 +110,10 @@ def get_training(indextype):
             samples = data["payload"]["values"] 
             if PROCESS:
                 data = feature_extraction(samples)
+                #print(data.shape)
                 result.append(data.tobytes()+struct.pack('b',indextype))
             else:
-                result.append(struct.pack('%sh' % len(samples), *samples)+struct.pack('b',indextype))
+                result.append(struct.pack(f"{len(samples)}h", *samples)+struct.pack('b',indextype))
     else:
         for i in range(TRAINING_ROUNDS_BEFORE_FL):
             if IID:
@@ -157,10 +164,10 @@ def get_testing ():
         
         samples = data["payload"]["values"] 
         if PROCESS:
-            data = speechpy.feature.mfcc(np.array(samples), 15999, frame_length = 0.02, frame_stride = 0.02, num_cepstral = 13, num_filters = 32, high_frequency = 0, low_frequency = 300, fft_length = 256, dc_elimination = True).astype('float32')
+            data = feature_extraction(samples)
             result.append(data.tobytes()+struct.pack('b',indextype))
         else:
-            result.append(struct.pack('%sh' % len(samples), *samples)+struct.pack('b',indextype))
+            result.append(struct.pack(f"{len(samples)}h", *samples)+struct.pack('b',indextype))
     return result
 
 if __name__ == "__main__":
@@ -175,7 +182,12 @@ if __name__ == "__main__":
         print("Weights reset")  
     except:
         print("File not present")  
-    
+    for i in range(NUM_CLIENTS):
+        try:
+            os.remove(f"test/momentum/m{i}")
+        except:
+            print("File not present")  
+        
     while enough_data():            
         for i in range(NUM_CLIENTS):
             print("Training", i)
@@ -184,17 +196,14 @@ if __name__ == "__main__":
                 file.write(b''.join(get_training(i+1)))
 
             #run training
-            process = subprocess.run(["./a.exe", patht, pathnw, pathw, "Learn"]) 
+            process = subprocess.run(["./a.exe", patht, pathnw, pathw, "Learn", f"test/momentum/m{i}"]) 
             print(process.stdout)
             #get resulting weights from 
             with open(pathw, "rb") as file:
                 data = file.read()
-                devices_weights[i] = struct.unpack('%sf' % NN_SIZE, data)
+                devices_weights[i] = struct.unpack(f'{NN_SIZE}f', data)
 
         with open(pathnw, "wb") as file: #write updated weights to file
-            file.write(b''.join(np.average(devices_weights, axis=0)))
-
-    with open(pathnw, "wb") as file: #write updated weights to file
             file.write(b''.join(np.average(devices_weights, axis=0)))
 
     print("DONE: testing")
@@ -202,10 +211,9 @@ if __name__ == "__main__":
     if TESTING:
         with open(patht,"wb") as file:
             data = get_testing()
-            #random.shuffle(data)
             file.write(b''.join(data))
 
-        process = subprocess.run(["./a.exe", patht, pathnw, pathw, "Test"]) 
+        process = subprocess.run(["./a.exe", patht, pathnw, pathw, "Test", "test/momentum/m0"]) 
         print(process.stdout)
 
     print ("Done")
