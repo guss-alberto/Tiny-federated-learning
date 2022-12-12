@@ -3,14 +3,20 @@
 #include "fft.h"
 #include "ml.h"
 
+#include "lib/LoRa/LoRa.h"
+#include "stdio.h"
 
 void init();
 uint8_t buttons();
 void simple_train(uint8_t class);
 
+const int8_t *modeStr[] = {"Training mode",
+                           "Evaluating mode",
+                           "Data recording"};
+
 #define REC_DELAY 200000
 
-uint8_t mode = MODE_LEARN;
+uint8_t mode = MODE_RECORD;
 
 union { //use union to save memory
     int16_t rec[NUM_SAMPLES];
@@ -24,9 +30,30 @@ union { //use union to save memory
 
 int main(void)
 {
+
     init();
     uint8_t a;
     uint32_t i;
+
+    char str[10];
+
+    while (1){
+        a = readRegister(REG_VERSION);
+        sprintf(str,"VerNo :%x\n",a);
+        UART_Write(str, 10);
+    }
+    a = readRegister(0x06);
+
+    sprintf(str,"Before:%x\n",a);
+    UART_Write(str, 10);
+
+    writeRegister(0x06, 0xea);
+    a = readRegister(0x1f);
+    sprintf(str,"After :%x\n",a);
+    UART_Write(str, 10);
+
+
+    while(1);
 
 #ifndef RECORD_ONLY_MODE
     Graphics_drawString(&ctx, (int8_t*)modeStr[(mode) - 1], 20, 20, 10, true);
@@ -83,7 +110,7 @@ int main(void)
             Graphics_drawString(&ctx, "processing...", 20, 10, 20, true);
             feature_extraction(myData.rec, myData.ml.input);
 
-            eval (myData.ml.input, myData.ml.out);
+            eval (myData.ml.input, myData.ml.out, myData.ml.out);
             char str[30];
             sprintf(str, "%.2f | %.2f | %.2f", myData.ml.out[0], myData.ml.out[1], myData.ml.out[2]);
 
@@ -149,19 +176,7 @@ void simple_train(uint8_t class){
 }
 
 
-const eUSCI_UART_ConfigV1 UART0Config =
-{
-     EUSCI_A_UART_CLOCKSOURCE_SMCLK,
-     13,
-     0,
-     27,
-     EUSCI_A_UART_NO_PARITY,
-     EUSCI_A_UART_LSB_FIRST,
-     EUSCI_A_UART_ONE_STOP_BIT,
-     EUSCI_A_UART_MODE,
-     EUSCI_A_UART_OVERSAMPLING_BAUDRATE_GENERATION,
-     EUSCI_A_UART_8_BIT_LEN
-};
+
 
 uint8_t buttons (){
     uint8_t a = 0;
@@ -180,13 +195,49 @@ uint8_t buttons (){
         Graphics_drawString(&ctx, "release btn", 20, 10, 20, true);
         while (!GPIO_getInputPinValue(GPIO_PORT_P4,GPIO_PIN1));
     }
+
+    if (!GPIO_getInputPinValue(GPIO_PORT_P1,GPIO_PIN1)&&!a){ //A
+       a = 1;
+       Graphics_drawString(&ctx, "release btn", 20, 10, 20, true);
+       while(!GPIO_getInputPinValue(GPIO_PORT_P1,GPIO_PIN1));
+   }
     return a;
 }
+
+const eUSCI_UART_ConfigV1 UART0Config =
+{
+     EUSCI_A_UART_CLOCKSOURCE_SMCLK,
+     13,
+     0,
+     27,
+     EUSCI_A_UART_NO_PARITY,
+     EUSCI_A_UART_LSB_FIRST,
+     EUSCI_A_UART_ONE_STOP_BIT,
+     EUSCI_A_UART_MODE,
+     EUSCI_A_UART_OVERSAMPLING_BAUDRATE_GENERATION,
+     EUSCI_A_UART_8_BIT_LEN
+};
+
+eUSCI_SPI_MasterConfig SPI0MasterConfig =
+{
+     EUSCI_B_SPI_CLOCKSOURCE_SMCLK,
+     480000000,
+     500000,
+     EUSCI_B_SPI_MSB_FIRST,
+     EUSCI_B_SPI_PHASE_DATA_CAPTURED_ONFIRST_CHANGED_ON_NEXT,
+     EUSCI_B_SPI_CLOCKPOLARITY_INACTIVITY_LOW,
+     EUSCI_B_SPI_3PIN
+};
+
 
 void init(){
     /* Halting WDT and disabling master interrupts */
     WDT_A_holdTimer();
     Interrupt_disableMaster();
+
+    //left button on msp board
+    MAP_GPIO_setAsInputPinWithPullUpResistor(GPIO_PORT_P1,GPIO_PIN1);
+
 
     //BUTTON B
     MAP_GPIO_setAsInputPinWithPullUpResistor(GPIO_PORT_P5,GPIO_PIN1);
@@ -226,7 +277,22 @@ void init(){
     GrContextFontSet(&ctx, &g_sFontFixed6x8);
     Graphics_clearDisplay(&ctx);
 
-    UART_Init(EUSCI_A0_BASE, UART0Config);
+
+    GPIO_setOutputLowOnPin(SPI_PORT, GPIO_PIN5);
+    GPIO_setAsOutputPin (SPI_PORT, GPIO_PIN5|GPIO_PIN6);
+    GPIO_setAsInputPin (SPI_PORT, GPIO_PIN7);
+    GPIO_setAsOutputPin (SPI_CS_PORT, SPI_CS_PIN|SPI_RSET_PIN);
+    GPIO_setOutputHighOnPin (SPI_CS_PORT, SPI_CS_PIN|SPI_RSET_PIN);
+
+    int i;
+    for(i = 0; i < 1000000; i++);
+
+    GPIO_setOutputLowOnPin(SPI_CS_PORT, SPI_RSET_PIN);
+    for(i = 0; i < 1000000; i++);
+
+
+    //SPI_Init(SPI0MasterConfig);
+    UART_Init(UART0Config);
     _micInit();
     ml_init();
 }

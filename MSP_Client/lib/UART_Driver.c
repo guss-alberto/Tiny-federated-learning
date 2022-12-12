@@ -10,11 +10,11 @@ volatile uint32_t UARTA0WriteIndex;
 #define UARTA0_BUFFER_EMPTY                UARTA0ReadIndex == UARTA0WriteIndex ? true : false
 #define UARTA0_BUFFER_FULL                 (UARTA0WriteIndex + 1) % UARTA0_BUFFERSIZE == UARTA0ReadIndex ? true : false
 
-void UART_Init(uint32_t UART, eUSCI_UART_ConfigV1 UARTConfig){
+void UART_Init(eUSCI_UART_ConfigV1 UARTConfig){
     MAP_GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P1, GPIO_PIN2 | GPIO_PIN3, GPIO_PRIMARY_MODULE_FUNCTION);
-    MAP_UART_initModule(UART, &UARTConfig);
-    MAP_UART_enableModule(UART);
-    MAP_UART_enableInterrupt(UART, EUSCI_A_UART_RECEIVE_INTERRUPT);
+    MAP_UART_initModule(EUSCI_A0_BASE, &UARTConfig);
+    MAP_UART_enableModule(EUSCI_A0_BASE);
+    MAP_UART_enableInterrupt(EUSCI_A0_BASE, EUSCI_A_UART_RECEIVE_INTERRUPT);
     MAP_Interrupt_enableInterrupt(INT_EUSCIA0);
 }
 
@@ -71,6 +71,7 @@ void EUSCIA0_IRQHandler(void)
     if(status & EUSCI_A_UART_RECEIVE_INTERRUPT_FLAG)
     {
         c = UART_receiveData(EUSCI_A0_BASE);
+        UART_transmitData(EUSCI_A0_BASE, c);
         UARTA0Data[UARTA0WriteIndex] = c;
         UARTA0_ADVANCE_WRITE_INDEX;
     }

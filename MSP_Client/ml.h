@@ -17,7 +17,7 @@ float change_L2 [NODES_L2][NODES_L1+1];
 void ml_init();
 
 //uses the neural network model to classify the input
-float eval (float *input, float *out, float *target){
+float eval (float *input, float *out, float *target);
 
 //backpropagates error and updates, return value is error
 float learn (float *input, float *out, float *target);

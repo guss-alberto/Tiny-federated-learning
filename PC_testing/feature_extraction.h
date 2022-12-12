@@ -60,9 +60,12 @@ void feature_extraction (int16_t *s, float *out){
 
         fix_fft(rfft, ifft, 9, 0);
         float nfft[FFT_WINDOW];
+        float energy  =  0;
         for (j=0; j<FFT_WINDOW; j++){
             nfft[j] = log(((rfft[j]*rfft[j] + ifft[j]*ifft[j])/32768.0f)+0.0000001);
+            energy += nfft[j];
         }
+        
         
         //calculate mel filterbanks 
         float mel[NUM_MEL_BANDS];
@@ -92,12 +95,15 @@ void feature_extraction (int16_t *s, float *out){
            }
            out[k+MFCC_COEFF*i] =  1.0 / (1.0 + exp(-sum * sqrt(2.0 / NUM_MEL_BANDS)));
        }
-
+        
         // DCT_NORMALIZATION_ORTHO
         out[MFCC_COEFF*i] = out[MFCC_COEFF*i] * sqrt(1.0f / (float)(4 * NUM_MEL_BANDS));
 		for (j = 1; j < MFCC_COEFF; j++) {
 			out[j+MFCC_COEFF*i] = out[j+MFCC_COEFF*i] * sqrt(1.0f / (float)(2 * NUM_MEL_BANDS));
 		}
+
+        //replace DC coefficient with frame energy
+        out[k+MFCC_COEFF*i] = energy;
     }
 
     //cmnw

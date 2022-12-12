@@ -44,8 +44,4 @@ Graphics_Context ctx;
 #define MODE_EVAL   0x02
 #define MODE_RECORD 0x03
 
-const int8_t *modeStr[] = {"Training mode",
-                           "Evaluating mode",
-                           "Data recording"};
-
 #endif

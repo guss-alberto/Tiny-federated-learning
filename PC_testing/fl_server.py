@@ -30,7 +30,7 @@ SAMPLE_RATE = 16000
 path = "../../TinyML-FederatedLearning-master/datasets/"
 
 PROCESS = True
-IID = False 
+IID = True 
 TESTING = True
 FILE_SOURCE = "paper"
 
