@@ -61,7 +61,7 @@ void HAL_LCD_SpiInit(void)
     eUSCI_SPI_MasterConfig config =
         {
             EUSCI_B_SPI_CLOCKSOURCE_SMCLK,
-            LCD_SYSTEM_CLOCK_SPEED,
+            48000000,
             LCD_SPI_CLOCK_SPEED,
             EUSCI_B_SPI_MSB_FIRST,
             EUSCI_B_SPI_PHASE_DATA_CAPTURED_ONFIRST_CHANGED_ON_NEXT,

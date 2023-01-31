@@ -1,5 +1,6 @@
 #include "UART_Driver.h"
-
+#include <stdarg.h>
+#include <stdio.h>
 /*UARTA0 Ring Buffer Global Variables*/
 volatile uint8_t UARTA0Data[UARTA0_BUFFERSIZE];
 volatile uint32_t UARTA0ReadIndex;
@@ -25,6 +26,23 @@ void UART_Write(const void *Data, uint32_t Size)
     {
         UART_transmitData(EUSCI_A0_BASE, ((int8_t*)Data)[i]);
     }
+}
+
+void UART_printf (char * format, ...)
+{
+  char buffer[256];
+  va_list args;
+  va_start (args, format);
+  vsnprintf (buffer, 255, format, args);
+  uint8_t i=0;
+  while (buffer[i]){
+      UART_transmitData(EUSCI_A0_BASE, buffer[i]);
+      i++;
+  }
+
+  //do something with the error
+
+  va_end (args);
 }
 
 void UART_Read(const void *Data, uint32_t Size)

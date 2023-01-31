@@ -3,65 +3,201 @@
 
 #include "includes.h"
 
-
-volatile arm_status status;
-
 #define DO_BIT_REVERSE 0
 #define FFT_FORWARD_TRANSFORM 0
 
+uint16_t freq_index[NUM_MEL_BANDS + 2];
 
+#define PAD_SIZE (CMNW_WIN_SIZE-1)/2
+
+
+void pad_symmetric (float* in, float* out);
+static float mel_to_frequency(float mel) {
+    return 700.0f * (exp(mel / 1127.0f) - 1.0f);
+}
+static float frequency_to_mel(float f) {
+    return 1127.0 * log(1 + f / 700.0f);
+}
+
+void init_mfcc(){
+    float mel[NUM_MEL_BANDS+2], hertz[NUM_MEL_BANDS+2];
+    uint16_t i;
+    float low  = frequency_to_mel (LOW_FREQ);
+    float high = frequency_to_mel (HIGH_FREQ);
+
+    //linear
+    for (i=0; i<NUM_MEL_BANDS+2; i++){
+        mel[i] = low + i*(high-low)/(NUM_MEL_BANDS+1);
+    }
+
+    for (i = 0; i < NUM_MEL_BANDS + 2; i++) {
+        hertz[i] = mel_to_frequency(mel[i]);
+        if (hertz[i] < LOW_FREQ) {
+            hertz[i] = LOW_FREQ;
+        }
+        if (hertz[i] > HIGH_FREQ) {
+            hertz[i] = HIGH_FREQ;
+        }
+    }
+    for (i = 0; i < NUM_MEL_BANDS + 2; i++) {
+        freq_index[i] = (int)(floor((FFT_WINDOW/2+2) * hertz[i] / SAMPLE_FREQUENCY))-1;
+    }
+}
 
 
 void feature_extraction (int16_t *s, float *out){
     uint32_t i, j, k;
-    union {
-        int16_t raw_fft[FFT_WINDOW * 2];
-        float   log[FFT_WINDOW];
-    } temp_data;
 
     for (i=0; i<NUM_FRAMES; i++){
-       arm_rfft_instance_q15 instance;
-       status = arm_rfft_init_q15(&instance, FFT_WINDOW, FFT_FORWARD_TRANSFORM, DO_BIT_REVERSE);
+        volatile arm_status status;
+        arm_rfft_instance_q15 instance;
+        status = arm_rfft_init_q15(&instance, FFT_WINDOW, FFT_FORWARD_TRANSFORM, DO_BIT_REVERSE);
 
-       arm_rfft_q15(&instance, s+i*FFT_WINDOW, temp_data.raw_fft);
-
-       //calculate magnitude in log scale
-       for(j = 0; j < FFT_WINDOW * 2; j += 2) {
-           temp_data.log[ j / 2 ] = log((sqrtf((temp_data.raw_fft[j]     * temp_data.raw_fft[j]) +
-                                               (temp_data.raw_fft[j + 1] * temp_data.raw_fft[j + 1])))+1);
-       }
-
-
-       //convert to log frequency scale
-       float mel[NUM_MEL_BANDS];
-       int16_t prev_band = 0;
-       int16_t curr_band = 1;
-       int16_t next_band = 3;
-       for (j = 1; next_band < FFT_WINDOW; j++){
-           float temp = 0;
-           for (k = prev_band; k < next_band; k++){
-               if (k < curr_band)
-                   temp += temp_data.log[k]*(curr_band-k)*(1.0/j);
-               else
-                   temp += temp_data.log[k]*(k-curr_band)*(1.0/j);
-          }
-           mel[j]=temp;
-           prev_band = curr_band;
-           curr_band = next_band;
-           next_band += j;
-       }
+        //preemphasis
+        int16_t fftwindow[FFT_WINDOW];
+        int16_t fftoutput[FFT_WINDOW*2];
+        for (j=PRE_SHIFT; j<FRAME_SIZE; j++){
+            fftwindow[j-PRE_SHIFT] = s[i*FRAME_SIZE+j] - PRE_COEFF*s[i*FRAME_SIZE+j-PRE_SHIFT];
+        }
 
 
-       //calculate first MFCC_COEFF of MFCC with DCT
-       for (k = 0; k < MFCC_COEFF; ++k) {
-           float sum = 0.;
+        //zero-pad to window
+        memset(fftwindow+FRAME_SIZE, 0, FFT_WINDOW-FRAME_SIZE);
+
+        arm_rfft_q15(&instance, fftwindow, fftoutput);
+
+
+
+        float nfft[FFT_WINDOW];
+        float energy  =  0;
+        for (j=0; j<FFT_WINDOW; j++){
+            nfft[j] = log(((fftoutput[j*2]*fftoutput[j*2] + fftoutput[j*2+1]*fftoutput[j*2+1])/32768.0f)+0.0000001);
+            energy += nfft[j];
+        }
+
+
+        //calculate mel filterbanks
+        float mel[NUM_MEL_BANDS];
+
+        for (j = 0; j < NUM_MEL_BANDS; j++){
+            int left = freq_index[j];
+            int middle = freq_index[j + 1];
+            int right = freq_index[j + 2];
+
+            float temp;
+            for (k = left+1; k<middle; k++){
+                temp+=nfft[k]*((float)(k-left)/(float)(middle-left));
+            }
+            for (k = middle; k<right; k++){
+                temp+=nfft[k]*(1-(float)(k-middle)/(float)(right-middle));
+            }
+
+            mel[j] = (temp/(left-right)+1);
+        }
+
+        //calculate first MFCC_COEFF of MFCC with DCT
+        for (k = 0; k < MFCC_COEFF; ++k) {
+           float sum = 0.0;
            float s = (k == 0) ? sqrt(.5) : 1.;
            for (j = 0; j < NUM_MEL_BANDS; ++j) {
              sum += s * mel[j] * cos(M_PI * (j + .5) * k / NUM_MEL_BANDS);
            }
            out[k+MFCC_COEFF*i] =  1.0 / (1.0 + exp(-sum * sqrt(2.0 / NUM_MEL_BANDS)));
-         }
+       }
 
+        // DCT_NORMALIZATION_ORTHO
+        out[MFCC_COEFF*i] = out[MFCC_COEFF*i] * sqrt(1.0f / (float)(4 * NUM_MEL_BANDS));
+        for (j = 1; j < MFCC_COEFF; j++) {
+            out[j+MFCC_COEFF*i] = out[j+MFCC_COEFF*i] * sqrt(1.0f / (float)(2 * NUM_MEL_BANDS));
+        }
+
+        //replace DC coefficient with frame energy
+        out[k+MFCC_COEFF*i] = energy;
+    }
+
+    //cmnw
+
+    //window mean subtraction
+    float padded[NUM_FRAMES+CMNW_WIN_SIZE][MFCC_COEFF];
+    pad_symmetric(out, *padded);
+    for (i=0; i<NUM_FRAMES; i++){
+        for (k=0; k<MFCC_COEFF; k++){
+            float sum = 0;
+            for (j=i; j<i+CMNW_WIN_SIZE; j++){
+                sum += padded[i][j];
+            }
+            out[k+MFCC_COEFF*i] -= sum/CMNW_WIN_SIZE;
+        }
+    }
+
+    //variance normalization
+    pad_symmetric(out, *padded);
+
+    for (i=0; i<NUM_FRAMES; i++){
+        float means[MFCC_COEFF] = {0};
+        for (k=0; k<MFCC_COEFF; k++){
+            float temp = 0;
+            float mean = 0;
+            for (j=i; j<i+CMNW_WIN_SIZE; j++){
+                mean += padded[i][j];
+            }
+            mean /= CMNW_WIN_SIZE;
+            for (j=i; j<i+CMNW_WIN_SIZE; j++){
+                temp += (padded[i][j]-mean)*(padded[i][j]-mean);
+            }
+            out[k+MFCC_COEFF*i] /= sqrt(temp/CMNW_WIN_SIZE);
+        }
+    }
+
+}
+
+void pad_symmetric (float* in, float* out){
+    int32_t pad_before_index = 0, ix;
+    bool pad_before_direction_up = true;
+
+    for (ix = PAD_SIZE - 1; ix >= 0; ix--) {
+            memcpy(out + (MFCC_COEFF * ix),
+                in + (pad_before_index * MFCC_COEFF),
+                MFCC_COEFF * sizeof(float));
+
+            if (pad_before_index == 0 && !pad_before_direction_up) {
+                pad_before_direction_up = true;
+            }
+            else if (pad_before_index == NUM_FRAMES - 1 && pad_before_direction_up) {
+                pad_before_direction_up = false;
+            }
+            else if (pad_before_direction_up) {
+                pad_before_index++;
+            }
+            else {
+                pad_before_index--;
+            }
+        }
+
+    memcpy(out + (MFCC_COEFF * PAD_SIZE),
+            in,
+            NUM_FRAMES * MFCC_COEFF * sizeof(float));
+
+    int32_t pad_after_index = NUM_FRAMES - 1;
+    bool pad_after_direction_up = false;
+
+    for (ix = 0; ix < PAD_SIZE; ix++) {
+        memcpy(out + (MFCC_COEFF * (ix + PAD_SIZE + NUM_FRAMES)),
+            in + (pad_after_index * MFCC_COEFF),
+            MFCC_COEFF * sizeof(float));
+
+        if (pad_after_index == 0 && !pad_after_direction_up) {
+            pad_after_direction_up = true;
+        }
+        else if (pad_after_index == NUM_FRAMES - 1 && pad_after_direction_up) {
+            pad_after_direction_up = false;
+        }
+        else if (pad_after_direction_up) {
+            pad_after_index++;
+        }
+        else {
+            pad_after_index--;
+        }
     }
 }
 

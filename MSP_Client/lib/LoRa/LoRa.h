@@ -1,18 +1,63 @@
-/*
- * LoRa.h
- *
- *  Created on: 9 Dec 2022
- *      Author: guss
- */
-
 #ifndef LIB_LORA_LORA_H_
 #define LIB_LORA_LORA_H_
 
-#include "../SPI_Driver.h"
+#include "../../includes.h"
 
+
+#define SPI_CS_PORT    GPIO_PORT_P5
+#define SPI_CS_PIN    GPIO_PIN0
+#define SPI_RSET_PIN   GPIO_PIN1
+
+#define SPI_PORT GPIO_PORT_P1
+#define SPI_MISO_PIN  GPIO_PIN7
+#define SPI_MOSI_PIN  GPIO_PIN6
+#define SPI_CLOCK_PIN GPIO_PIN5
+
+void selectModule(uint8_t pin);
 uint8_t readRegister(uint8_t address);
 
-void writeRegister(uint8_t address, uint8_t value);
+void LoRa_Init();
+uint8_t LoRa_Begin (long frequency);
+
+void end();
+
+int beginPacket(int implicitHeade);
+int endPacket(bool async);
+
+int LoRa_parsePacket(int size);
+int LoRa_packetRssi();
+float packetSnr();
+long packetFrequencyError();
+
+int rssi();
+
+// from Print
+size_t LoRa_write(const uint8_t *buffer, size_t size);
+
+// from Stream
+int LoRa_available();
+int LoRa_read();
+int peek();
+
+void idle();
+void sleep();
+
+void setTxPower(int level, int outputPin);
+void setFrequency(uint64_t frequency);
+void setSpreadingFactor(int sf);
+void setSignalBandwidth(long sbw);
+void setCodingRate4(int denominator);
+void setPreambleLength(long length);
+void setSyncWord(int sw);
+void enableCrc();
+void disableCrc();
+void enableInvertIQ();
+void disableInvertIQ();
+
+void setOCP(uint8_t mA); // Over Current Protection control
+
+void setGain(uint8_t gain); // Set LNA gain
+
 
 
 // registers
@@ -73,5 +118,8 @@ void writeRegister(uint8_t address, uint8_t value);
 #define RSSI_OFFSET_LF_PORT      164
 
 #define MAX_PKT_LENGTH           255
+
+#define PA_OUTPUT_RFO_PIN          0
+#define PA_OUTPUT_PA_BOOST_PIN     1
 
 #endif /* LIB_LORA_LORA_H_ */

@@ -9,6 +9,7 @@
 
 #define UARTA0_BUFFERSIZE 128
 
+void UART_printf (char * format, ...);
 void UART_Init(eUSCI_UART_ConfigV1 UARTConfig);
 void UART_Write(const void *Data, uint32_t Size);
 void UART_Read(const void *Data, uint32_t Size);

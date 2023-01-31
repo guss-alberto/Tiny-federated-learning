@@ -4,8 +4,8 @@
 #include "includes.h"
 
 uint16_t num_epochs = 0;
-float LearningRate = 0.3;
-float Momentum = 0.9;
+float LearningRate = LEARNINGRATE;
+float Momentum = LEARNINGMOMENTUM;
 
 float weights_L1[NODES_L1][NODES_L0+1];
 float change_L1 [NODES_L1][NODES_L0+1];
@@ -16,15 +16,17 @@ float change_L2 [NODES_L2][NODES_L1+1];
 //initializes the weight values to random
 void ml_init();
 
+//sends or get the model data
+void sendModel ();
+void getModel ();
+
+
 //uses the neural network model to classify the input
 float eval (float *input, float *out, float *target);
 
 //backpropagates error and updates, return value is error
 float learn (float *input, float *out, float *target);
 
-//sends or get the model data over UART
-void sendModel ();
-void getModel ();
 
 void ml_init(){
     uint16_t i, j;
@@ -129,10 +131,35 @@ float learn (float *input, float *out, float *target){
    return error/NODES_L2;
 }
 
+void LoRa_sendLarge(void* data, uint32_t length){
+    int32_t i;
+    for (i=0; i<length; i+=255){
+        beginPacket(false);
+        if (i + 255 > length)
+            LoRa_write(((uint8_t*)data)+i, length-i);
+        else
+            LoRa_write(((uint8_t*)data)+i, 255);
+        endPacket(false);
+    }
+}
+
+void LoRa_getLarge(void* dst, uint32_t length){
+    uint32_t i=0, packetLength=0;
+    while (1) {
+        packetLength += LoRa_parsePacket(0);
+        if (packetLength>i){
+            while (LoRa_available()) {
+              ((uint8_t*)dst)[i++] = LoRa_read(); //read to value
+              if (i>=length)
+                  return;
+            }
+        }
+    }
+}
 
 void sendModel (){
-    UART_Write(weights_L1, sizeof(weights_L1));
-    UART_Write(weights_L2, sizeof(weights_L2));
+    LoRa_sendLarge(weights_L1, sizeof(weights_L1));
+    LoRa_sendLarge(weights_L2, sizeof(weights_L2));
 }
 
 void getModel (){
