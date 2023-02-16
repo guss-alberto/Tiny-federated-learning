@@ -14,7 +14,7 @@
 
 Graphics_Context ctx;
 
-//#define RECEIVERMODE
+#define RECEIVERMODE
 #define TEST_SENDER
 #define DEVICE_ID 1
 
@@ -54,13 +54,15 @@ Graphics_Context ctx;
 #define NUM_SAMPLES FRAME_SIZE*NUM_FRAMES
 #define NODES_L0 MFCC_COEFF*NUM_FRAMES
 
+
+#define BROADCAST    0xff
 #define FL_READY     0x01
 #define FL_SEND_DATA 0x02
 #define REQUEST_TRAINING_DATA 0x03
 #define DATA_READY 0x04
 #define RECEIVE_TRAINING 0x05
 #define RAW_DATA_READY 0x06
-#define CHANGE_MODE 0xff
+#define NEW_MODEL 0x07
 
 #define MODE_LEARN  0x01
 #define MODE_EVAL   0x02
