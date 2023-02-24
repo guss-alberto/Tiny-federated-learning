@@ -39,9 +39,8 @@ int main(void)
         {
             UART_printf("packetSize = %d\n", packetSize);
             // read packet
-            while (LoRa_available())
+            while ((a = LoRa_read())!=-1)
             {
-                a = LoRa_read();
                 UART_Write(&a, 1);
             }
             // print RSSI of packet
@@ -66,7 +65,7 @@ int main(void)
     endPacket(false);
     UART_printf("Message Sent!\n");
 
-    UART_printf("Test message Sent!\n");
+    /*UART_printf("Test message Sent!\n");
     uint32_t time = millis();
 
     memset(weights_L1, 'a', sizeof(weights_L1));
@@ -74,7 +73,7 @@ int main(void)
 
     sendModel();
     UART_printf("Long message sent in %d ms\n", millis() - time);
-
+    */
 #else
     init_mfcc();
     _micInit();
@@ -82,29 +81,6 @@ int main(void)
     uint8_t a;
     uint32_t i;
 
-    UART_printf("test start\n");
-
-    // send packet
-    selectModule(SPI_CS1_PIN);
-    /*beginPacket(false);
-    write("Hello, world!\n",14);
-    endPacket(false);
-    UART_printf("Message Sent!\n");
-
-
-    while(1){
-        int packetSize = parsePacket(0);
-        if (packetSize)  {
-            UART_printf("packetSize = %d\n",packetSize);
-                // read packet
-            while (available()) {
-              a = read();
-              UART_Write(&a,1);
-            }
-        // print RSSI of packet
-        UART_printf("With RSSI %d\n", packetRssi());
-        }
-    }*/
     Graphics_drawString(&ctx, (int8_t *)modeStr[(mode)-1], 20, 20, 10, true);
     srand(RANDOM_SEED);
     while (1)
@@ -313,7 +289,7 @@ void init()
     CS_initClockSignal(CS_SMCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1);
     CS_initClockSignal(CS_ACLK, CS_REFOCLK_SELECT, CS_CLOCK_DIVIDER_1);
 
-    init_timer();
+    //init_timer();
     /* Initializes display */
     Crystalfontz128x128_Init();
 

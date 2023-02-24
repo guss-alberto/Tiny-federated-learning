@@ -145,11 +145,12 @@ void LoRa_sendLarge(void* data, uint32_t length){
 
 void LoRa_getLarge(void* dst, uint32_t length){
     uint32_t i=0, packetLength=0;
+    uint8_t val;
     while (1) {
         packetLength += LoRa_parsePacket(0);
         if (packetLength>i){
-            while (LoRa_available()) {
-              ((uint8_t*)dst)[i++] = LoRa_read(); //read to value
+            while ((val = LoRa_read())!=-1) {
+              ((uint8_t*)dst)[i++] = val; //read to value
               if (i>=length)
                   return;
             }

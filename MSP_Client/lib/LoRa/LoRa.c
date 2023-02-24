@@ -36,22 +36,17 @@ uint8_t bitRead(uint8_t *x, uint8_t n)
 int beginPacket(int implicitHeader)
 {
   if (isTransmitting())
-  {
     return 0;
-  }
 
   // put in standby mode
   idle();
-
-  if (implicitHeader)
-  {
-    implicitHeaderMode();
+  if (_implicitHeaderMode != implicitHeader){
+    if (implicitHeader)
+      implicitHeaderMode();
+    else
+      explicitHeaderMode();
   }
-  else
-  {
-    explicitHeaderMode();
-  }
-
+  
   // reset FIFO address and paload length
   writeRegister(REG_FIFO_ADDR_PTR, 0);
   writeRegister(REG_PAYLOAD_LENGTH, 0);
@@ -71,8 +66,7 @@ int endPacket(bool async)
   if (!async)
   {
     // wait for TX done
-    while ((readRegister(REG_IRQ_FLAGS) & IRQ_TX_DONE_MASK) == 0)
-      ;
+    while ((readRegister(REG_IRQ_FLAGS) & IRQ_TX_DONE_MASK) == 0);
     // clear IRQ's
     writeRegister(REG_IRQ_FLAGS, IRQ_TX_DONE_MASK);
   }
@@ -103,14 +97,13 @@ int LoRa_parsePacket(int size)
 
   if (size > 0)
   {
-    implicitHeaderMode();
+    if (_implicitHeaderMode == 0)
+      implicitHeaderMode();
 
     writeRegister(REG_PAYLOAD_LENGTH, size & 0xff);
   }
-  else
-  {
+  else if (_implicitHeaderMode == 1)
     explicitHeaderMode();
-  }
 
   // clear IRQ's
   writeRegister(REG_IRQ_FLAGS, irqFlags);
@@ -122,13 +115,9 @@ int LoRa_parsePacket(int size)
 
     // read packet length
     if (_implicitHeaderMode)
-    {
       packetLength = readRegister(REG_PAYLOAD_LENGTH);
-    }
     else
-    {
       packetLength = readRegister(REG_RX_NB_BYTES);
-    }
 
     // set FIFO address to current RX address
     writeRegister(REG_FIFO_ADDR_PTR, readRegister(REG_FIFO_RX_CURRENT_ADDR));
@@ -208,12 +197,12 @@ size_t LoRa_write(const uint8_t *buffer, size_t size)
   return size;
 }
 
-int LoRa_available()
+uint8_t LoRa_available()
 {
   return (readRegister(REG_RX_NB_BYTES) - _packetIndex);
 }
 
-int LoRa_read()
+uint8_t LoRa_read()
 {
   if (!LoRa_available())
   {
@@ -225,7 +214,7 @@ int LoRa_read()
   return readRegister(REG_FIFO);
 }
 
-int peek()
+uint8_t peek()
 {
   if (!LoRa_available())
   {
@@ -254,19 +243,13 @@ void sleep()
   writeRegister(REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_SLEEP);
 }
 
-void setTxPower(int level, int outputPin)
+void setTxPower(uint8_t level, uint8_t outputPin)
 {
   if (PA_OUTPUT_RFO_PIN == outputPin)
   {
     // RFO
-    if (level < 0)
-    {
-      level = 0;
-    }
-    else if (level > 14)
-    {
+    if (level > 14)
       level = 14;
-    }
 
     writeRegister(REG_PA_CONFIG, 0x70 | level);
   }
@@ -302,11 +285,11 @@ void setTxPower(int level, int outputPin)
   }
 }
 
-void setFrequency(uint64_t frequency)
+void setFrequency(uint32_t frequency)
 {
   _frequency = frequency;
 
-  uint64_t frf = ((uint64_t)frequency << 19) / 32000000;
+  uint32_t frf = ((uint32_t)frequency << 19) / 32000000;
 
   writeRegister(REG_FRF_MSB, (uint8_t)(frf >> 16));
   writeRegister(REG_FRF_MID, (uint8_t)(frf >> 8));
@@ -315,22 +298,20 @@ void setFrequency(uint64_t frequency)
 
 int getSpreadingFactor()
 {
-  return readRegister(REG_MODEM_CONFIG_2) >> 4;
+  return (readRegister(REG_MODEM_CONFIG_2) >> 4) &0b1111;
 }
 
-void setSpreadingFactor(int sf)
+void setSpreadingFactor(uint8_t sf)
 {
   if (sf < 6)
-  {
     sf = 6;
-  }
   else if (sf > 12)
-  {
     sf = 12;
-  }
 
   if (sf == 6)
   {
+    if (!_implicitHeaderMode)
+        implicitHeaderMode();
     writeRegister(REG_DETECTION_OPTIMIZE, 0xc5);
     writeRegister(REG_DETECTION_THRESHOLD, 0x0c);
   }
@@ -344,122 +325,66 @@ void setSpreadingFactor(int sf)
   setLdoFlag();
 }
 
-long getSignalBandwidth()
-{
-  uint8_t bw = (readRegister(REG_MODEM_CONFIG_1) >> 4);
-
-  switch (bw)
-  {
-  case 0:
-    return 7.8E3;
-  case 1:
-    return 10.4E3;
-  case 2:
-    return 15.6E3;
-  case 3:
-    return 20.8E3;
-  case 4:
-    return 31.25E3;
-  case 5:
-    return 41.7E3;
-  case 6:
-    return 62.5E3;
-  case 7:
-    return 125E3;
-  case 8:
-    return 250E3;
-  case 9:
-    return 500E3;
-  }
-
-  return -1;
-}
-
-void setSignalBandwidth(long sbw)
+void setSignalBandwidth(uint32_t sbw) //updated
 {
   int bw;
 
-  if (sbw <= 7.8E3)
-  {
+  if (sbw <= 125E3)
     bw = 0;
-  }
-  else if (sbw <= 10.4E3)
-  {
-    bw = 1;
-  }
-  else if (sbw <= 15.6E3)
-  {
-    bw = 2;
-  }
-  else if (sbw <= 20.8E3)
-  {
-    bw = 3;
-  }
-  else if (sbw <= 31.25E3)
-  {
-    bw = 4;
-  }
-  else if (sbw <= 41.7E3)
-  {
-    bw = 5;
-  }
-  else if (sbw <= 62.5E3)
-  {
-    bw = 6;
-  }
-  else if (sbw <= 125E3)
-  {
-    bw = 7;
-  }
   else if (sbw <= 250E3)
-  {
-    bw = 8;
-  }
-  else /*if (sbw <= 250E3)*/
-  {
-    bw = 9;
-  }
+    bw = 1;
+  else
+    bw = 3;
 
-  writeRegister(REG_MODEM_CONFIG_1, (readRegister(REG_MODEM_CONFIG_1) & 0x0f) | (bw << 4));
+  writeRegister(REG_MODEM_CONFIG_1, (readRegister(REG_MODEM_CONFIG_1) & 0x3f) | (bw << 6));
   setLdoFlag();
+}
+
+
+long getSignalBandwidth(){
+    int bw = (readRegister(REG_MODEM_CONFIG_1) >> 6) & 0b11;
+    switch (bw) {
+    case 0:
+        return 125E3;
+    case 1:
+        return 250E3;
+    case 3:
+        return 500E3;
+    }
+    return 0;
 }
 
 void setLdoFlag()
 {
-  // Section 4.1.1.5
-  long symbolDuration = 1000 / (getSignalBandwidth() / (1L << getSpreadingFactor()));
+  uint8_t config = readRegister(REG_MODEM_CONFIG_1);
 
-  // Section 4.1.1.6
-  bool ldoOn = symbolDuration > 16;
+  if (getSpreadingFactor()>= 11 && getSignalBandwidth() == 125E3) // mandated for SF11 and SF12 with BW = 125 kHz
+      config |= 1;
+  else
+      config &= 0xfe;
 
-  uint8_t config3 = readRegister(REG_MODEM_CONFIG_3);
-  bitWrite(&config3, 3, ldoOn);
-  writeRegister(REG_MODEM_CONFIG_3, config3);
+  writeRegister(REG_MODEM_CONFIG_1, config);
 }
 
-void setCodingRate4(int denominator)
+void setCodingRate4(uint8_t denominator)
 {
   if (denominator < 5)
-  {
     denominator = 5;
-  }
   else if (denominator > 8)
-  {
     denominator = 8;
-  }
 
   int cr = denominator - 4;
 
-  writeRegister(REG_MODEM_CONFIG_1, (readRegister(REG_MODEM_CONFIG_1) & 0xf1) | (cr << 1));
+  writeRegister(REG_MODEM_CONFIG_1, (readRegister(REG_MODEM_CONFIG_1) & 0xf1) | (cr << 3));
 }
 
-void setPreambleLength(long length)
+void setPreambleLength(uint16_t length)
 {
   writeRegister(REG_PREAMBLE_MSB, (uint8_t)(length >> 8));
   writeRegister(REG_PREAMBLE_LSB, (uint8_t)(length >> 0));
 }
 
-void setSyncWord(int sw)
+void setSyncWord(uint8_t sw)
 {
   writeRegister(REG_SYNC_WORD, sw);
 }
@@ -477,27 +402,27 @@ void disableCrc()
 void enableInvertIQ()
 {
   writeRegister(REG_INVERTIQ, 0x66);
-  writeRegister(REG_INVERTIQ2, 0x19);
+  //writeRegister(REG_INVERTIQ2, 0x19);
 }
 
 void disableInvertIQ()
 {
   writeRegister(REG_INVERTIQ, 0x27);
-  writeRegister(REG_INVERTIQ2, 0x1d);
+  //writeRegister(REG_INVERTIQ2, 0x1d);
 }
 
-void setOCP(uint8_t mA)
+void setOCP(uint8_t mA) //updated
 {
+  if (mA == -1){
+    writeRegister(REG_OCP, 0); //disable OCP 
+    return;
+  }
   uint8_t ocpTrim = 27;
 
   if (mA <= 120)
-  {
     ocpTrim = (mA - 45) / 5;
-  }
   else if (mA <= 240)
-  {
     ocpTrim = (mA + 30) / 10;
-  }
 
   writeRegister(REG_OCP, 0x20 | (0x1F & ocpTrim));
 }
@@ -506,9 +431,7 @@ void setGain(uint8_t gain)
 {
   // check allowed range
   if (gain > 6)
-  {
     gain = 6;
-  }
 
   // set to standby
   idle();
@@ -517,32 +440,27 @@ void setGain(uint8_t gain)
   if (gain == 0)
   {
     // if gain = 0, enable AGC
-    writeRegister(REG_MODEM_CONFIG_3, 0x04);
+    writeRegister(REG_MODEM_CONFIG_2, readRegister(REG_MODEM_CONFIG_2)|0b100);
   }
   else
   {
     // disable AGC
-    writeRegister(REG_MODEM_CONFIG_3, 0x00);
+      writeRegister(REG_MODEM_CONFIG_2, readRegister(REG_MODEM_CONFIG_2)&0b11111011);
 
-    // clear Gain and set LNA boost
-    writeRegister(REG_LNA, 0x03);
-
-    // set gain
-    writeRegister(REG_LNA, readRegister(REG_LNA) | (gain << 5));
+    // set gain and set LNA boost
+    writeRegister(REG_LNA, 0b11 | (gain << 5));
   }
 }
 
 void explicitHeaderMode()
 {
   _implicitHeaderMode = 0;
-
   writeRegister(REG_MODEM_CONFIG_1, readRegister(REG_MODEM_CONFIG_1) & 0xfe);
 }
 
 void implicitHeaderMode()
 {
   _implicitHeaderMode = 1;
-
   writeRegister(REG_MODEM_CONFIG_1, readRegister(REG_MODEM_CONFIG_1) | 0x01);
 }
 
@@ -576,20 +494,18 @@ void LoRa_Init()
 #endif
 
   int i;
-  for (i = 0; i < 10000; i++)
-    ;
+  for (i = 0; i < 10000; i++);
   GPIO_setOutputLowOnPin(SPI_CS_PORT, SPI_RSET_PIN); // wait for board to reset
-  for (i = 0; i < 10000; i++)
-    ;
+  for (i = 0; i < 10000; i++);
 }
 
-#define BANDWIDTH 0b00
+#define BANDWIDTH 0b10
 /*Signal bandwidth:
     00 -> 125 kHz
     01 -> 250 kHz
     10 -> 500 kHz
 */
-#define ERROR_CODING_RATE 0b001
+#define ERROR_CODING_RATE 0b011
 /*Error coding rate
     001 -> 4/5
     010 -> 4/6
@@ -612,46 +528,38 @@ void LoRa_Init()
 /*LNA gain setting:
     000 -> reserved
     001 -> G1 = highest gain
-    010 -> G2 = highest gain – 6 dB
-    011 -> G3 = highest gain – 12 dB
-    100 -> G4 = highest gain – 24 dB
-    101 -> G5 = highest gain – 36 dB
-    110 -> G6 = highest gain – 48 dB
+    010 -> G2 = highest gain -> 6 dB
+    011 -> G3 = highest gain -> 12 dB
+    100 -> G4 = highest gain -> 24 dB
+    101 -> G5 = highest gain -> 36 dB
+    110 -> G6 = highest gain -> 48 dB
     111 -> reserved
 */
-#define LNA_BOOST 0b00
-/* Improves the system Noise Figure at the expense of Rx current
-consumption:
-00 -> Default setting, meeting the specification
-11 -> Improved sensitivity
- */
+
 uint8_t LoRa_Begin(long frequency)
 {
   uint8_t version = readRegister(REG_VERSION);
   if (version != 0x22)
-  {
     return 0;
-  }
-
   // put in sleep mode
   sleep();
 
   // set frequency
-  // setFrequency(frequency);
+  setFrequency(frequency);
 
   // set base addresses
   writeRegister(REG_FIFO_TX_BASE_ADDR, 0);
   writeRegister(REG_FIFO_RX_BASE_ADDR, 0);
 
   // set bandwidth, error coding rate
-  writeRegister(REG_MODEM_CONFIG_1, (BANDWIDTH << 6) | (ERROR_CODING_RATE) | 0b000);
+  setSignalBandwidth(500E3);
+  setCodingRate4(7);
+  setSpreadingFactor(6);
+  //writeRegister(REG_MODEM_CONFIG_1, (BANDWIDTH << 6) | (ERROR_CODING_RATE) | 0b000);
   // set
-  writeRegister(REG_MODEM_CONFIG_2, (SPREADING_FACTOR << 4) | (AUTOMATIC_GAIN_CONTROL << 2) | 0b10);
+  //writeRegister(REG_MODEM_CONFIG_2, (SPREADING_FACTOR << 4) | (AUTOMATIC_GAIN_CONTROL << 2) | 0b10);
 
-  // set LNA boost
-  writeRegister(REG_LNA, (LNA_GAIN << 5) | LNA_BOOST);
-
-  // set output power to 17 dBm
+  // set output power to 20 dBm
   setTxPower(20, 0);
 
   // put in standby mode

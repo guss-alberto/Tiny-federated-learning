@@ -35,20 +35,20 @@ int rssi();
 size_t LoRa_write(const uint8_t *buffer, size_t size);
 
 // from Stream
-int LoRa_available();
-int LoRa_read();
-int peek();
+uint8_t LoRa_available();
+uint8_t LoRa_read();
+uint8_t peek();
 
 void idle();
 void sleep();
 
-void setTxPower(int level, int outputPin);
-void setFrequency(uint64_t frequency);
-void setSpreadingFactor(int sf);
-void setSignalBandwidth(long sbw);
-void setCodingRate4(int denominator);
-void setPreambleLength(long length);
-void setSyncWord(int sw);
+void setTxPower(uint8_t level, uint8_t outputPin);
+void setFrequency(uint32_t frequency);
+void setSpreadingFactor(uint8_t sf);
+void setSignalBandwidth(uint32_t sbw);
+void setCodingRate4(uint8_t denominator);
+void setPreambleLength(uint16_t length);
+void setSyncWord(uint8_t sw);
 void enableCrc();
 void disableCrc();
 void enableInvertIQ();
@@ -83,19 +83,17 @@ void setGain(uint8_t gain); // Set LNA gain
 #define REG_PREAMBLE_MSB         0x20
 #define REG_PREAMBLE_LSB         0x21
 #define REG_PAYLOAD_LENGTH       0x22
-#define REG_MODEM_CONFIG_3       0x26
-#define REG_FREQ_ERROR_MSB       0x28
+#define REG_FREQ_ERROR_MSB       0x28 
 #define REG_FREQ_ERROR_MID       0x29
-#define REG_FREQ_ERROR_LSB       0x2a
+#define REG_FREQ_ERROR_LSB       0x2a 
 #define REG_RSSI_WIDEBAND        0x2c
 #define REG_DETECTION_OPTIMIZE   0x31
 #define REG_INVERTIQ             0x33
 #define REG_DETECTION_THRESHOLD  0x37
 #define REG_SYNC_WORD            0x39
-#define REG_INVERTIQ2            0x3b
 #define REG_DIO_MAPPING_1        0x40
 #define REG_VERSION              0x42
-#define REG_PA_DAC               0x4d
+#define REG_PA_DAC               0x5a
 
 // modes
 #define MODE_LONG_RANGE_MODE     0x80
