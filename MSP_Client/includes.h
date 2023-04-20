@@ -15,7 +15,8 @@
 Graphics_Context ctx;
 
 #define RECEIVERMODE
-#define TEST_SENDER
+//#define TEST_SENDER
+#define TEST_RDT
 #define DEVICE_ID 1
 
 #define RANDOM_SEED 17762

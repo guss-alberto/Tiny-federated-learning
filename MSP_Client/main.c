@@ -32,40 +32,40 @@ int main(void)
 #if defined RECEIVERMODE
     uint8_t a;
     UART_printf("test start\n");
+    uint8_t buffer[256];
     while (1)
     {
         int packetSize = LoRa_parsePacket(0);
         if (packetSize)
         {
-            UART_printf("packetSize = %d\n", packetSize);
+            //UART_printf("packetSize = %d\n", packetSize);
+            UART_Write(&packetSize, 1);
             // read packet
-            while ((a = LoRa_read())!=-1)
-            {
-                UART_Write(&a, 1);
-            }
+            a = LoRa_read(buffer);
+            UART_Write(buffer, a);
             // print RSSI of packet
             // UART_printf("With RSSI %d\n", LoRa_packetRssi());
         }
 
         if (UART_Read_nb(&a, 1))
         {
-            uint8_t buffer[256];
             UART_Read(buffer, a);
 
             beginPacket(false);
             LoRa_write(buffer, a);
             endPacket(false);
+            UART_printf("packet sent");
         }
     }
 #elif defined TEST_SENDER
-    UART_printf("test start\n");
+    UART_printf("test start (sender)\n");
 
     beginPacket(false);
     LoRa_write("Hello, world!\n", 14);
     endPacket(false);
     UART_printf("Message Sent!\n");
 
-    /*UART_printf("Test message Sent!\n");
+    UART_printf("Test message Sent!\n");
     uint32_t time = millis();
 
     memset(weights_L1, 'a', sizeof(weights_L1));
@@ -73,7 +73,33 @@ int main(void)
 
     sendModel();
     UART_printf("Long message sent in %d ms\n", millis() - time);
-    */
+#elif defined TEST_RDT
+#define CHUNKSIZE 254
+    UART_printf("Test RDT\n");
+    size_t sequence=0, ack, offset=0;
+    int8_t data[16000], buffer[256];
+    while (1){
+        int packetSize = LoRa_parsePacket(0);
+        if (packetSize){
+            LoRa_read(buffer);
+            sequence = (int8_t)buffer[0];
+            UART_Write(buffer+1, packetSize-1);
+            if (ack == sequence){
+               sequence++;
+               memcpy(data+offset, buffer+1, packetSize-1);
+               offset+=packetSize-1;
+
+               LoRa_sendPacket(&ack,1);
+               UART_printf("Ack packet %d, length %d, content:\n", ack, packetSize);
+               UART_Write(buffer+1, packetSize-1);
+               if(packetSize-1<CHUNKSIZE)
+                   break;
+
+            }
+        }
+    }
+    UART_printf("\n\nData received %d bytes:\n\n",  offset);
+    UART_Write(data, offset);
 #else
     init_mfcc();
     _micInit();
@@ -289,7 +315,7 @@ void init()
     CS_initClockSignal(CS_SMCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1);
     CS_initClockSignal(CS_ACLK, CS_REFOCLK_SELECT, CS_CLOCK_DIVIDER_1);
 
-    //init_timer();
+    init_timer();
     /* Initializes display */
     Crystalfontz128x128_Init();
 

@@ -174,6 +174,8 @@ int rssi()
   return (readRegister(REG_RSSI_VALUE) - (_frequency < RF_MID_BAND_THRESHOLD ? RSSI_OFFSET_LF_PORT : RSSI_OFFSET_HF_PORT));
 }
 
+
+
 size_t LoRa_write(const uint8_t *buffer, size_t size)
 {
   int currentLength = readRegister(REG_PAYLOAD_LENGTH);
@@ -202,11 +204,11 @@ uint8_t LoRa_available()
   return (readRegister(REG_RX_NB_BYTES) - _packetIndex);
 }
 
-uint8_t LoRa_read()
+uint8_t LoRa_readByte()
 {
   if (!LoRa_available())
   {
-    return -1;
+    return 255;
   }
 
   _packetIndex++;
@@ -214,11 +216,21 @@ uint8_t LoRa_read()
   return readRegister(REG_FIFO);
 }
 
+
+uint8_t LoRa_read(uint8_t* buffer){
+    uint8_t length=0;
+    while (LoRa_available()){
+        buffer[length]=readRegister(REG_FIFO);
+        length++;
+    }
+    return length;
+}
+
 uint8_t peek()
 {
   if (!LoRa_available())
   {
-    return -1;
+    return 255;
   }
 
   // store current FIFO address
@@ -243,15 +255,15 @@ void sleep()
   writeRegister(REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_SLEEP);
 }
 
-void setTxPower(uint8_t level, uint8_t outputPin)
+void setTxPower(int8_t level, uint8_t outputPin)
 {
   if (PA_OUTPUT_RFO_PIN == outputPin)
   {
     // RFO
-    if (level > 14)
-      level = 14;
+    if (level > 13)
+      level = 13;
 
-    writeRegister(REG_PA_CONFIG, 0x70 | level);
+    writeRegister(REG_PA_CONFIG, level+1);
   }
   else
   {
@@ -413,7 +425,7 @@ void disableInvertIQ()
 
 void setOCP(uint8_t mA) //updated
 {
-  if (mA == -1){
+  if (mA == 255){
     writeRegister(REG_OCP, 0); //disable OCP 
     return;
   }
@@ -499,74 +511,6 @@ void LoRa_Init()
   for (i = 0; i < 10000; i++);
 }
 
-#define BANDWIDTH 0b10
-/*Signal bandwidth:
-    00 -> 125 kHz
-    01 -> 250 kHz
-    10 -> 500 kHz
-*/
-#define ERROR_CODING_RATE 0b011
-/*Error coding rate
-    001 -> 4/5
-    010 -> 4/6
-    011 -> 4/7
-    100 -> 4/8
-*/
-#define SPREADING_FACTOR 7
-/*SF rate (expressed as a base-2 logarithm)
-    6  -> 64   chips / symbol
-    7  -> 128  chips / symbol
-    8  -> 256  chips / symbol
-    9  -> 512  chips / symbol
-    10 -> 1024 chips / symbol
-    11 -> 2048 chips / symbol
-    12 -> 4096 chips / symbol
-*/
-#define AUTOMATIC_GAIN_CONTROL true
-
-#define LNA_GAIN 0b001
-/*LNA gain setting:
-    000 -> reserved
-    001 -> G1 = highest gain
-    010 -> G2 = highest gain -> 6 dB
-    011 -> G3 = highest gain -> 12 dB
-    100 -> G4 = highest gain -> 24 dB
-    101 -> G5 = highest gain -> 36 dB
-    110 -> G6 = highest gain -> 48 dB
-    111 -> reserved
-*/
-
-uint8_t LoRa_Begin(long frequency)
-{
-  uint8_t version = readRegister(REG_VERSION);
-  if (version != 0x22)
-    return 0;
-  // put in sleep mode
-  sleep();
-
-  // set frequency
-  setFrequency(frequency);
-
-  // set base addresses
-  writeRegister(REG_FIFO_TX_BASE_ADDR, 0);
-  writeRegister(REG_FIFO_RX_BASE_ADDR, 0);
-
-  // set bandwidth, error coding rate
-  setSignalBandwidth(500E3);
-  setCodingRate4(7);
-  setSpreadingFactor(6);
-  //writeRegister(REG_MODEM_CONFIG_1, (BANDWIDTH << 6) | (ERROR_CODING_RATE) | 0b000);
-  // set
-  //writeRegister(REG_MODEM_CONFIG_2, (SPREADING_FACTOR << 4) | (AUTOMATIC_GAIN_CONTROL << 2) | 0b10);
-
-  // set output power to 20 dBm
-  setTxPower(20, 0);
-
-  // put in standby mode
-  idle();
-
-  return 1;
-}
 
 #ifndef BIT_BANG
 uint8_t readRegister(uint8_t address)
@@ -634,6 +578,21 @@ uint8_t readRegister(uint8_t address)
   return r;
 }
 
+size_t LoRa_sendPacket(const uint8_t *buffer, size_t size){
+    if (size >  MAX_PKT_LENGTH)
+        size = MAX_PKT_LENGTH;
+
+    beginPacket(false);
+    uint32_t i;
+    for (i = 0; i < size; i++){
+      writeRegister(REG_FIFO, buffer[i]);
+    }
+
+    writeRegister(REG_PAYLOAD_LENGTH, size);
+    endPacket(false);
+    return size;
+}
+
 void writeRegister(uint8_t address, uint8_t value)
 {
   address |= 0x80; // set first bit to 1 for write
@@ -648,6 +607,34 @@ void writeRegister(uint8_t address, uint8_t value)
   // end transaction with cs high
   // GPIO_setOutputHighOnPin (SPI_CS_PORT, SPI_CS_PIN);
   P5->OUT |= SPI_CS_PIN;
+}
+
+uint8_t LoRa_Begin(long frequency)
+{
+  uint8_t version = readRegister(REG_VERSION);
+  if (version != 0x22)
+    return 0;
+  // put in sleep mode
+  sleep();
+
+  // set frequency
+  //setFrequency(frequency);
+
+  // set base addresses
+  writeRegister(REG_FIFO_TX_BASE_ADDR, 0);
+  writeRegister(REG_FIFO_RX_BASE_ADDR, 0);
+  //enableCrc();
+  // set bandwidth, error coding rate
+  setSignalBandwidth(125E3);
+  setSpreadingFactor(7);
+  setCodingRate4(5);
+  //set output power to 13 dBm
+  setTxPower(13, PA_OUTPUT_RFO_PIN);
+
+  // put in standby mode
+  idle();
+
+  return 1;
 }
 
 #endif

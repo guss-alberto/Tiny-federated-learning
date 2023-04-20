@@ -131,14 +131,17 @@ float learn (float *input, float *out, float *target){
    return error/NODES_L2;
 }
 
+
+#define CHUNK_SIZE 25
+
 void LoRa_sendLarge(void* data, uint32_t length){
     int32_t i;
-    for (i=0; i<length; i+=255){
+    for (i=0; i<length; i+=CHUNK_SIZE){
         beginPacket(false);
-        if (i + 255 > length)
+        if (i + CHUNK_SIZE > length)
             LoRa_write(((uint8_t*)data)+i, length-i);
         else
-            LoRa_write(((uint8_t*)data)+i, 255);
+            LoRa_write(((uint8_t*)data)+i, CHUNK_SIZE);
         endPacket(false);
     }
 }
@@ -149,7 +152,7 @@ void LoRa_getLarge(void* dst, uint32_t length){
     while (1) {
         packetLength += LoRa_parsePacket(0);
         if (packetLength>i){
-            while ((val = LoRa_read())!=-1) {
+            while ((val = LoRa_readByte())!=255) {
               ((uint8_t*)dst)[i++] = val; //read to value
               if (i>=length)
                   return;

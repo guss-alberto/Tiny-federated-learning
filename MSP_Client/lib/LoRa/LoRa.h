@@ -36,13 +36,15 @@ size_t LoRa_write(const uint8_t *buffer, size_t size);
 
 // from Stream
 uint8_t LoRa_available();
-uint8_t LoRa_read();
+uint8_t LoRa_readByte();
+uint8_t LoRa_read(uint8_t* buffer);
+size_t  LoRa_sendPacket(const uint8_t *buffer, size_t size);
 uint8_t peek();
 
 void idle();
 void sleep();
 
-void setTxPower(uint8_t level, uint8_t outputPin);
+void setTxPower(int8_t level, uint8_t outputPin);
 void setFrequency(uint32_t frequency);
 void setSpreadingFactor(uint8_t sf);
 void setSignalBandwidth(uint32_t sbw);
