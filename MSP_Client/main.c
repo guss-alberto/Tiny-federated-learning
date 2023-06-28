@@ -1,275 +1,80 @@
 #include "includes.h"
-#include "microphone.h"
+//#include "microphone.h"
+
+#ifndef PRE_PROCESSED
 #include "fft.h"
+#endif
 #include "ml.h"
 #include "lib/test.h"
 #include "stdio.h"
 
 void init();
-uint8_t buttons();
 void simple_train(uint8_t class);
 
-#define REC_DELAY 200000
-
-uint8_t mode = MODE_RECORD;
-
-union
-{ // use union to save memory
-    int16_t rec[NUM_SAMPLES];
-    struct
-    {
-        float input[NODES_L0];
-        float out[NODES_L2];
-        float target[NODES_L2];
-        float error;
-    } ml;
-} myData;
-
+float input[NODES_L0];
+float out[NODES_L2];
+float target[NODES_L2];
+float error;
 int main(void)
 {
     init();
-
-#if defined RECEIVERMODE
-    uint8_t a;
-    UART_printf("test start\n");
-    uint8_t buffer[256];
-    while (1)
-    {
-        int packetSize = LoRa_parsePacket(0);
-        if (packetSize)
-        {
-            //UART_printf("packetSize = %d\n", packetSize);
-            UART_Write(&packetSize, 1);
-            // read packet
-            a = LoRa_read(buffer);
-            UART_Write(buffer, a);
-            // print RSSI of packet
-            // UART_printf("With RSSI %d\n", LoRa_packetRssi());
-        }
-
-        if (UART_Read_nb(&a, 1))
-        {
-            UART_Read(buffer, a);
-
-            beginPacket(false);
-            LoRa_write(buffer, a);
-            endPacket(false);
-            UART_printf("packet sent");
-        }
-    }
-#elif defined TEST_SENDER
-    UART_printf("test start (sender)\n");
-
-    beginPacket(false);
-    LoRa_write("Hello, world!\n", 14);
-    endPacket(false);
-    UART_printf("Message Sent!\n");
-
-    UART_printf("Test message Sent!\n");
-    uint32_t time = millis();
-
-    memset(weights_L1, 'a', sizeof(weights_L1));
-    memset(weights_L2, 'b', sizeof(weights_L2));
-
-    sendModel();
-    UART_printf("Long message sent in %d ms\n", millis() - time);
-#elif defined TEST_RDT
-#define CHUNKSIZE 254
-    UART_printf("Test RDT\n");
-    size_t sequence=0, ack, offset=0;
-    int8_t data[16000], buffer[256];
-    while (1){
-        int packetSize = LoRa_parsePacket(0);
-        if (packetSize){
-            LoRa_read(buffer);
-            sequence = (int8_t)buffer[0];
-            UART_Write(buffer+1, packetSize-1);
-            if (ack == sequence){
-               sequence++;
-               memcpy(data+offset, buffer+1, packetSize-1);
-               offset+=packetSize-1;
-
-               LoRa_sendPacket(&ack,1);
-               UART_printf("Ack packet %d, length %d, content:\n", ack, packetSize);
-               UART_Write(buffer+1, packetSize-1);
-               if(packetSize-1<CHUNKSIZE)
-                   break;
-
-            }
-        }
-    }
-    UART_printf("\n\nData received %d bytes:\n\n",  offset);
-    UART_Write(data, offset);
-#else
+#ifndef PRE_PROCESSED
     init_mfcc();
-    _micInit();
+    uint16_t recording[NUM_SAMPLES];
+#endif
+    //_micInit();
     ml_init();
-    uint8_t a;
-    uint32_t i;
+    uint8_t msgtype;
+    uint8_t class;
 
-    Graphics_drawString(&ctx, (int8_t *)modeStr[(mode)-1], 20, 20, 10, true);
+    //GPIO_setAsOutputPin(GPIO_PORT_P2, 0b111);
     srand(RANDOM_SEED);
-    while (1)
-    {
-        int packetSize = parsePacket(0);
-        // if message available on LoRa
-        if (packetSize)
-        {
-            a = LoRa_read(); // read device ID
-            if (a == DEVICE_ID)
-            {
-                a = LoRa_read(); // read packet type
-                switch (a)
+    while (1)  {
+        // if message available on UART
+        if (UART_Read_nb(&msgtype,1)){
+            switch (msgtype)
                 {
-                case FL_READY:
-                    LoRa_write(&a, 1);                           // send message back to indicate ready status
-                    LoRa_write(&num_epochs, sizeof(num_epochs)); // send number of epochs
+                case MODEL_REQUEST:
+                    UART_Write(&num_epochs, sizeof(num_epochs)); // send number of epochs
                     sendModel();                                 // send NN weights
                     num_epochs = 0;                              // reset number of epochs to zero
                     break;
-                case RECEIVE_TRAINING:
-                    a = REQUEST_TRAINING_DATA;
-                    beginPacket(false);
-                    LoRa_write(&a, 1);
-                    endPacket(false); // send request for training data
-                    // Graphics_drawString(&ctx, "using serial data", 20, 20, 20, true);
-
-                    LoRa_getLarge(myData.ml.input, sizeof(myData.ml.input)); // Wait for data input
-
-                    while (packetSize = parsePacket(0);)
-                        a = LoRa_read(); // get output class
-
-                    simple_train(a);
-                    beginPacket(false);
-                    LoRa_Write(&myData.ml.error, sizeof(float));
-                    endPacket(false);
-                    break;
-                }
-            }
-            else if (a == BROADCAST)
-            {
-                a = LoRa_read(); // read device ID
-                switch (a)
-                {
-                case NEW_MODEL:
+                case ML_MODEL:
                     getModel();
                     break;
+
+                case TRAINING_SAMPLE:
+                    UART_Read(&class,1);
+                    #ifndef PRE_PROCESSED
+                    UART_Read(&recording, NUM_SAMPLES*2);
+                    feature_extraction(recording, input);
+                    #else
+                    UART_Read(&input, NODES_L0*sizeof(float));
+                    #endif
+
+                    UART_Write(&input, NODES_L0*sizeof(float));
+
+                    simple_train(class);
+                    UART_Write(&error,sizeof(error));
+                    break;
+                default:
+                    UART_Read(&class,1);
+                    UART_Write(&class,1);
                 }
             }
-        }
-        else
-        {
-
-            switch (mode)
-            {
-            case MODE_LEARN:
-                a = buttons();
-                if (!a)
-                    break; // if no buttons are pushed exit and continue the loop
-                for (i = 0; i < REC_DELAY; i++)
-                    ;
-                Graphics_drawString(&ctx, "sampling.....", 20, 20, 20, true);
-                micSample(myData.rec);
-                Graphics_drawString(&ctx, "processing...", 20, 10, 20, true);
-                feature_extraction(myData.rec, myData.ml.input);
-
-                simple_train(a);
-                break;
-            case MODE_EVAL:
-                a = buttons();
-                if (!a)
-                    break; // if no buttons are pushed exit and continue the loop
-                for (i = 0; i < REC_DELAY; i++)
-                    ;
-                Graphics_drawString(&ctx, "sampling.....", 20, 10, 20, true);
-                micSample(myData.rec);
-                Graphics_drawString(&ctx, "processing...", 20, 10, 20, true);
-                feature_extraction(myData.rec, myData.ml.input);
-
-                eval(myData.ml.input, myData.ml.out, myData.ml.out);
-                char str[30];
-                sprintf(str, "%.2f | %.2f | %.2f", myData.ml.out[0], myData.ml.out[1], myData.ml.out[2]);
-
-                Graphics_drawString(&ctx, "DONE!........", 20, 10, 20, true);
-                Graphics_drawString(&ctx, (int8_t *)str, 30, 10, 30, true);
-                break;
-            case MODE_RECORD:
-                a = buttons();
-                if (a)
-                {
-                    for (i = 0; i < REC_DELAY; i++)
-                        ;
-                    Graphics_drawString(&ctx, "sampling.....", 20, 10, 20, true);
-                    micSample(myData.rec);
-                    Graphics_drawString(&ctx, "processing...", 20, 10, 20, true);
-                    feature_extraction(myData.rec, myData.ml.input);
-                    const char tmp = DATA_READY;
-                    UART_Write(&tmp, 1); // send ready message
-
-                    UART_Write(myData.ml.input, sizeof(myData.ml.input));
-                    UART_Write(&a, 1); // send class
-                    Graphics_drawString(&ctx, "DONE!........", 20, 10, 20, true);
-                }
-                break;
-            }
-        }
     }
-#endif
 }
 
 void simple_train(uint8_t class)
 {
-    myData.ml.target[0] = 0;
-    myData.ml.target[1] = 0;
-    myData.ml.target[2] = 0;
-    myData.ml.target[class - 1] = 1.0; // button 1 -> {1,0,0};  button 2 -> {0,1,0};  button 3 -> {0,0,1}
+    target[0] = 0;
+    target[1] = 0;
+    target[2] = 0;
+    target[class - 1] = 1.0; // button 1 -> {1,0,0};  button 2 -> {0,1,0};  button 3 -> {0,0,1}
 
-    myData.ml.error = learn(myData.ml.input, myData.ml.out, myData.ml.target); // train
-
-    char str[30];
-    sprintf(str, "%.2f | %.2f | %.2f", myData.ml.out[0], myData.ml.out[1], myData.ml.out[2]);
-
-    Graphics_drawString(&ctx, "DONE!........", 20, 10, 20, true);
-    Graphics_drawString(&ctx, (int8_t *)str, 30, 10, 30, true);
-    sprintf(str, "ERR: %.2f", myData.ml.error);
-    Graphics_drawString(&ctx, (int8_t *)str, 30, 10, 40, true);
+   error = learn(input, out, target); // train
 
     num_epochs++;
-}
-
-uint8_t buttons()
-{
-    uint8_t a = 0;
-    if (!GPIO_getInputPinValue(GPIO_PORT_P3, GPIO_PIN5) && !a)
-    { // A
-        a = 1;
-        Graphics_drawString(&ctx, "release btn", 20, 10, 20, true);
-        while (!GPIO_getInputPinValue(GPIO_PORT_P3, GPIO_PIN5))
-            ;
-    }
-    if (!GPIO_getInputPinValue(GPIO_PORT_P5, GPIO_PIN1) && !a)
-    { // B
-        a = 2;
-        Graphics_drawString(&ctx, "release btn", 20, 10, 20, true);
-        while (!GPIO_getInputPinValue(GPIO_PORT_P5, GPIO_PIN1))
-            ;
-    }
-    if (!GPIO_getInputPinValue(GPIO_PORT_P4, GPIO_PIN1) && !a)
-    { // J
-        a = 3;
-        Graphics_drawString(&ctx, "release btn", 20, 10, 20, true);
-        while (!GPIO_getInputPinValue(GPIO_PORT_P4, GPIO_PIN1))
-            ;
-    }
-
-    if (!GPIO_getInputPinValue(GPIO_PORT_P1, GPIO_PIN1) && !a)
-    { // A
-        a = 1;
-        Graphics_drawString(&ctx, "release btn", 20, 10, 20, true);
-        while (!GPIO_getInputPinValue(GPIO_PORT_P1, GPIO_PIN1))
-            ;
-    }
-    return a;
 }
 
 const eUSCI_UART_ConfigV1 UART0Config =
@@ -283,7 +88,8 @@ const eUSCI_UART_ConfigV1 UART0Config =
         EUSCI_A_UART_ONE_STOP_BIT,
         EUSCI_A_UART_MODE,
         EUSCI_A_UART_OVERSAMPLING_BAUDRATE_GENERATION,
-        EUSCI_A_UART_8_BIT_LEN};
+        EUSCI_A_UART_8_BIT_LEN
+   };
 
 void init()
 {
@@ -315,26 +121,8 @@ void init()
     CS_initClockSignal(CS_SMCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1);
     CS_initClockSignal(CS_ACLK, CS_REFOCLK_SELECT, CS_CLOCK_DIVIDER_1);
 
-    init_timer();
-    /* Initializes display */
-    Crystalfontz128x128_Init();
-
-    /* Set default screen orientation */
-    Crystalfontz128x128_SetOrientation(LCD_ORIENTATION_UP);
-
-    /* Initializes graphics context */
-    Graphics_initContext(&ctx, &g_sCrystalfontz128x128,
-                         &g_sCrystalfontz128x128_funcs);
-
-    Graphics_setForegroundColor(&ctx, GRAPHICS_COLOR_BLACK);
-    Graphics_setBackgroundColor(&ctx, GRAPHICS_COLOR_WHITE);
-    GrContextFontSet(&ctx, &g_sFontFixed6x8);
-    Graphics_clearDisplay(&ctx);
+    //init_timer();
 
     UART_Init(UART0Config);
-    LoRa_Init(); // initialize pins and reset lora boards
-    if (!LoRa_Begin(915E6))
-    {
-        UART_printf("Board failed to initialize\n");
-    }
+    Interrupt_enableMaster();
 }

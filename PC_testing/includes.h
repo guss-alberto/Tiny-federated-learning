@@ -13,7 +13,7 @@
 
 
 #define LEARNINGRATE 0.6
-#define LEARNINGMOMENTUM 0.9
+#define LEARNINGMOMENTUM 0
 #define NODES_L1 25
 #define NODES_L2 3
 

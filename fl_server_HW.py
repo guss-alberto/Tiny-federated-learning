@@ -10,32 +10,49 @@ import json
 import os
 import random
 import speechpy 
-
-NUM_CLIENTS = 3
+import serial
+from serial.tools.list_ports import comports
 
 FFT_WINDOW = 512
 
 MFCC_COEFF =  13
 NUM_FRAMES =  50
+BAUDRATE = 230400
 
 TRAINING_ROUNDS_BEFORE_FL = 30
 NODES_L0 = NUM_FRAMES*MFCC_COEFF
-NODES_L1 = 25
+NODES_L1 = 21
 NODES_L2 = 3
 
 NN_SIZE = NODES_L1*(NODES_L0+1) + NODES_L2*(NODES_L1+1)
 N_SAMPLES = 16000
 SAMPLE_RATE = 16000
-path = "../../TinyML-FederatedLearning-master/datasets/"
+path = "../TinyML-FederatedLearning-master/datasets/"
 
-resfile = "C:/Users/guss/Desktop/datta/wwwwwwww{}.csv"
+resfile = "C:/Users/guss/Desktop/datta/Test_20_nodes{}.csv"
 
 PROCESS = True
 IID = True  
-TESTING = False
 FILE_SOURCE = "paper"
 
 FRAME_LENGTH_TEST = N_SAMPLES/(SAMPLE_RATE*(NUM_FRAMES+2))
+
+
+def get_uart_ports():
+    client_ports = []
+    for port in comports():
+        if "UART" in port.description: #find all uart ports
+            print(port.name, port.description)
+            client_ports.append(port.name)
+    return client_ports
+
+device_ports = get_uart_ports()
+NUM_CLIENTS = len(device_ports)
+
+
+TRAINING_SAMPLE = b"\x01"
+ML_MODEL =        b"\x02"
+MODEL_REQUEST =   b"\x03"
 
 
 if FILE_SOURCE == "paper":
@@ -43,15 +60,15 @@ if FILE_SOURCE == "paper":
     pedraforca_files = [file for file in os.listdir(path+"mountains") if file.startswith("pedraforca")]
     vermell_files = [file for file in os.listdir(path+"colors") if file.startswith("vermell")]
     verd_files = [file for file in os.listdir(path+"colors") if file.startswith("verd")]
-    blau_files = [file for file in os.listdir(path+"colors") if file.startswith("blau")]
-    test_montserrat_files = [file for file in os.listdir(path+"test") if file.startswith("montserrat")]
-    test_pedraforca_files = [file for file in os.listdir(path+"test") if file.startswith("pedraforca")]       
+    blau_files = [file for file in os.listdir(path+"colors") if file.startswith("blau")]   
 
     random.shuffle(montserrat_files)
     random.shuffle(pedraforca_files)
+    random.shuffle(vermell_files)
+    random.shuffle(verd_files)
+    random.shuffle(blau_files)
 
     mountains      = list(sum(zip(montserrat_files, pedraforca_files), ()))
-    test_mountains = list(sum(zip(test_montserrat_files, test_pedraforca_files), ()))
 else:
     def load_ds (path):
         data = []
@@ -71,13 +88,7 @@ def feature_extraction(samples):
     data = speechpy.processing.preemphasis(np.array(samples), shift=1, cof=0.98)
     data = speechpy.feature.mfcc(np.array(samples), SAMPLE_RATE, frame_length = FRAME_LENGTH_TEST, frame_stride = FRAME_LENGTH_TEST, num_cepstral = MFCC_COEFF, num_filters = 32, high_frequency = SAMPLE_RATE/2, low_frequency = 300, fft_length = FFT_WINDOW, dc_elimination = True)
     data = speechpy.processing.cmvnw(data, win_size=101, variance_normalization=True)
-    #print(len(data))
-    #for i in range(NUM_FRAMES):
-    #    line = ""
-    #    for j in range(MFCC_COEFF):
-    #        line += f"{data[i][j]:.6f}\t"
-    #    print(line)
-    #exit()
+    
     return data.astype('float32')
 
 def get_training(indextype):
@@ -102,21 +113,14 @@ def get_training(indextype):
                 elif indextype == 4:
                     data = json.load(open(path+"colors/"   +verd_files.pop()))      
                 elif indextype == 5:
-                    data = json.load(open(path+"colors/"   +blau_files.pop()))      
-                elif indextype == 6:
-                    data = json.load(open(path+"test/"     +test_montserrat_files.pop()))     
-                    indextype = 1
-                elif indextype == 7:
-                    data = json.load(open(path+"test/"     +test_pedraforca_files.pop()))  
-                    indextype = 2
-                    
+                    data = json.load(open(path+"colors/"   +blau_files.pop())) 
             samples = data["payload"]["values"] 
             if PROCESS:
                 data = feature_extraction(samples)
                 #print(data.shape)
-                result.append(data.tobytes()+struct.pack('b',indextype))
+                result.append(struct.pack('b',indextype) + data.tobytes())
             else:
-                result.append(struct.pack(f"{len(samples)}h", *samples)+struct.pack('b',indextype))
+                result.append(struct.pack('b',indextype) + struct.pack(f"{len(samples)}h", *samples))
     else:
         for i in range(TRAINING_ROUNDS_BEFORE_FL):
             if IID:
@@ -131,7 +135,7 @@ def get_training(indextype):
             if PROCESS:
                 indextype = data[-1]
                 data = feature_extraction(data[0:-1])
-                result.append(data.tobytes()+struct.pack('b',indextype))
+                result.append(struct.pack('b',indextype) + data.tobytes())
             else:
                 result.append(data)
     
@@ -155,75 +159,68 @@ def enough_data():
             if len(blue_data) < TRAINING_ROUNDS_BEFORE_FL*NUM_CLIENTS: return False
             return True
 
-def get_testing ():
-    result = []
-    data = {}
-    while len(test_mountains)>0:
-        filename = test_mountains.pop()
-        if (filename.startswith("montserrat")):
-            indextype = 1
-        elif (filename.startswith("pedraforca")):
-            indextype = 2
-        data = json.load(open(path+"test/"+filename))
+def startFL (id, ser, dataset, global_model, local_models, num_epochs):
+    rounds = 0
+    print("Device %s start"%id)
+    if len(global_model)==NN_SIZE:
+        print("Writing new data to device %s"%id)
+        buf = ML_MODEL + struct.pack('%sf' % NN_SIZE, *global_model) #send new weights back to device
+        ser.write(buf)
+    for sample in dataset:
+        buf = TRAINING_SAMPLE + sample
+        ser.write(buf)
+        print (buf)
+        print("------------")
+        tst = ser.read(NODES_L0*4)
+        print(tst)
+        print(struct.unpack('%sf' % NODES_L0, tst))
+        exit()
+        rounds+=1
+        error_raw = ser.read(4)
+        error = struct.unpack("f",error_raw)
+        print(error)
+    ser.write(MODEL_REQUEST)
+    buf = ser.read(2)
+    print(buf)
+    num_epochs[id] = struct.unpack('h', buf)
+    print(num_epochs[id])
+
+    buf = ser.read(NN_SIZE*4)
+    local_models[id] = struct.unpack('%sf' % NN_SIZE, buf)
+
+    return
+
+if __name__ == "__main__":    
+    client_ports = [] 
+    
+    for port in device_ports:
+        client_ports.append(serial.Serial(port, baudrate=BAUDRATE, bytesize=8, stopbits=serial.STOPBITS_ONE, timeout=10))
+    round = 0
+    global_model = []
+    
+    while enough_data():
+        local_models = np.empty((len(device_ports), NN_SIZE), dtype='float32')
+        threads = []
+        num_epochs = []
+        print("Round %s"%round)
         
-        samples = data["payload"]["values"] 
-        if PROCESS:
-            data = feature_extraction(samples)
-            result.append(data.tobytes()+struct.pack('b',indextype))
-        else:
-            result.append(struct.pack(f"{len(samples)}h", *samples)+struct.pack('b',indextype))
-    return result
+        for i, device in enumerate(client_ports):
+            device_dataset = get_training(i+1)
+            num_epochs.append(0)
+            thread = threading.Thread(target=startFL, args=(i, device, device_dataset, global_model, local_models, num_epochs))
+            thread.daemon = True
+            thread.start()
+            threads.append(thread)
+    
+        for thread in threads: thread.join() # Wait for all the threads to end
 
-if __name__ == "__main__":
-    devices = [] 
-    devices_weights = np.empty((NUM_CLIENTS, NN_SIZE), dtype='float32')
-    pathnw = "test/new_weights"
-    path_weights = "test/weights"
-    path_training = "test/data"   
+        print ("AVERAGING NN WEIGHTS")
+        global_model = np.average(local_models, axis=0, weights=num_epochs).tolist()
+        round+=1
 
-    try:
-        os.remove(pathnw) #reset weights if leftover from previous attempt
-        print("Weights reset")  
-    except:
-        print("File not present")  
-    for i in range(NUM_CLIENTS):
-        try:
-            os.remove(f"test/momentum/m{i}")
-        except:
-            print("File not present")  
-        
-    while enough_data():            
-        for i in range(NUM_CLIENTS):
-            print("Training", i)
-            #convert and prepare training data
-            with open(path_training,"wb") as file:
-                file.write(b''.join(get_training(i+1)))
-
-            #run training
-            process = subprocess.run(["./a.exe", path_training, pathnw, path_weights, "Learn", f"test/momentum/m{i}"], capture_output=True) 
-            output = process.stdout.decode("utf-8")
-            print(output)
-
-            with open(resfile.format(i), "a") as file:
-                file.write(output)
-
-            #get resulting weights from 
-            with open(path_weights, "rb") as file:
-                data = file.read()
-                devices_weights[i] = struct.unpack(f'{NN_SIZE}f', data)
-
-        with open(pathnw, "wb") as file: #write updated weights to file
-            file.write(b''.join(np.average(devices_weights, axis=0)))
-        print("FL")
-
-    print("DONE: testing")
-    #testing
-    if TESTING:
-        with open(path_training,"wb") as file:
-            data = get_testing()
-            file.write(b''.join(data))
-
-        process = subprocess.run(["./a.exe", path_training, pathnw, path_weights, "Test", "test/momentum/m0"]) 
-        print(process.stdout)
+    buf = struct.pack('%sf' % NN_SIZE, *global_model) #send new weights back to device
+    for device in client_ports:
+        device.write(buf)
 
     print ("Done")
+

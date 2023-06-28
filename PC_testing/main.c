@@ -38,7 +38,7 @@ int main(int argc, char **argv){
 
     FILE* weightsfile =  fopen(argv[2],"rb");
     if (weightsfile){
-        printf("Weights loaded\n");
+        //printf("Weights loaded\n");
         getModel(weightsfile);
         fclose(weightsfile);
     } else {
@@ -48,7 +48,7 @@ int main(int argc, char **argv){
     #ifdef USE_MOMENTUM
     FILE* dirfile =  fopen(argv[5],"rb");
         if (dirfile){
-            printf("Momentum loaded\n");
+            //printf("Momentum loaded\n");
             getDir(dirfile);
             fclose(dirfile);
         }
@@ -56,7 +56,7 @@ int main(int argc, char **argv){
 
     bool mode = (argv[4][0]=='T');
     if (mode){
-        printf("Testing mode\n");
+        //printf("Testing mode\n");
     }
 
     uint8_t a;

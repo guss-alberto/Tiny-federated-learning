@@ -5,6 +5,7 @@
         "math.h": "c",
         "stdbool.h": "c",
         "ml.h": "c",
-        "feature_extraction.h": "c"
+        "feature_extraction.h": "c",
+        "stdlib.h": "c"
     }
 }

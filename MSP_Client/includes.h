@@ -1,9 +1,6 @@
 #include <ti/devices/msp432p4xx/inc/msp.h>
 #include <ti/devices/msp432p4xx/driverlib/driverlib.h>
-#include <ti/grlib/grlib.h>
-#include "lib/LcdDriver/Crystalfontz128x128_ST7735.h"
 #include "lib/UART_Driver.h"
-#include "lib/LoRa/LoRa.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <arm_math.h>
@@ -12,21 +9,14 @@
 #ifndef __INCLUDES_H__
 #define __INCLUDES_H__
 
-Graphics_Context ctx;
-
-#define RECEIVERMODE
-//#define TEST_SENDER
-#define TEST_RDT
-#define DEVICE_ID 1
-
 #define RANDOM_SEED 17762
 
-#define USE_MOMENTUM
-
+//#define USE_MOMENTUM
+#define PRE_PROCESSED
 
 #define LEARNINGRATE 0.6
 #define LEARNINGMOMENTUM 0.9
-#define NODES_L1 20
+#define NODES_L1 21
 #define NODES_L2 3
 
 #define RANDOM_SEED 17762
@@ -40,7 +30,7 @@ Graphics_Context ctx;
 #define NUM_FRAMES  50
 #define FFT_WINDOW 512
 
-//highest and lowest freuencies for mel filters
+//highest and lowest frequencies for mel filters
 #define NUM_MEL_BANDS 32
 #define LOW_FREQ   300.0f
 #define HIGH_FREQ  SAMPLE_FREQUENCY/2.0f
@@ -56,17 +46,8 @@ Graphics_Context ctx;
 #define NODES_L0 MFCC_COEFF*NUM_FRAMES
 
 
-#define BROADCAST    0xff
-#define FL_READY     0x01
-#define FL_SEND_DATA 0x02
-#define REQUEST_TRAINING_DATA 0x03
-#define DATA_READY 0x04
-#define RECEIVE_TRAINING 0x05
-#define RAW_DATA_READY 0x06
-#define NEW_MODEL 0x07
-
-#define MODE_LEARN  0x01
-#define MODE_EVAL   0x02
-#define MODE_RECORD 0x03
+#define TRAINING_SAMPLE 0x01
+#define ML_MODEL 0x02
+#define MODEL_REQUEST 0x03
 
 #endif

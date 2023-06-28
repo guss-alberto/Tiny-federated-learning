@@ -8,10 +8,14 @@ float LearningRate = LEARNINGRATE;
 float Momentum = LEARNINGMOMENTUM;
 
 float weights_L1[NODES_L1][NODES_L0+1];
-float change_L1 [NODES_L1][NODES_L0+1];
-
 float weights_L2[NODES_L2][NODES_L1+1];
+
+
+#ifdef USE_MOMENTUM
+float change_L1 [NODES_L1][NODES_L0+1];
 float change_L2 [NODES_L2][NODES_L1+1];
+#endif
+
 
 //initializes the weight values to random
 void ml_init();
@@ -30,16 +34,21 @@ float learn (float *input, float *out, float *target);
 
 void ml_init(){
     uint16_t i, j;
+    num_epochs = 0;
     for (i=0; i<NODES_L1; i++){
         for (j=0; j<=NODES_L0; j++){
             weights_L1[i][j] = (2.0*(float)rand()/RAND_MAX)-1.0;
+            #ifdef USE_MOMENTUM
             change_L1[i][j] = 0;
+            #endif
         }
     }
     for (i=0; i<NODES_L2; i++){
         for (j=0; j<=NODES_L1; j++){
             weights_L2[i][j] = (2.0*(float)rand()/RAND_MAX)-1.0;
+            #ifdef USE_MOMENTUM
             change_L2[i][j] = 0;
+            #endif
         }
     }
 }
@@ -108,6 +117,7 @@ float learn (float *input, float *out, float *target){
    }
 
 
+    #ifdef USE_MOMENTUM
    //update hidden weights
    for(i=0; i < NODES_L1; i++) {
        change_L1[i][0] = LearningRate * delta_L1[i] + Momentum * change_L1[i][0];
@@ -128,42 +138,34 @@ float learn (float *input, float *out, float *target){
            weights_L2[i][j+1] += change_L2[i][j+1] ;
        }
    }
+#else
+   //update hidden weights
+      for(i=0; i < NODES_L1; i++) {
+          weights_L1[i][0] += LearningRate * delta_L1[i];
+          for(j = 0 ; j < NODES_L0 ; j++ ) {
+              weights_L1[i][j+1] += LearningRate * input[j] * delta_L1[i];
+          }
+      }
+
+
+      //update output weights
+      for(i=0; i < NODES_L2; i++) {
+          weights_L2[i][0] += LearningRate * delta_L2[i];
+          for(j = 0 ; j < NODES_L1 ; j++ ) {
+              weights_L2[i][j+1] += LearningRate * input[j] * delta_L2[i];
+          }
+      }
+
+#endif
+
    return error/NODES_L2;
 }
 
 
-#define CHUNK_SIZE 25
-
-void LoRa_sendLarge(void* data, uint32_t length){
-    int32_t i;
-    for (i=0; i<length; i+=CHUNK_SIZE){
-        beginPacket(false);
-        if (i + CHUNK_SIZE > length)
-            LoRa_write(((uint8_t*)data)+i, length-i);
-        else
-            LoRa_write(((uint8_t*)data)+i, CHUNK_SIZE);
-        endPacket(false);
-    }
-}
-
-void LoRa_getLarge(void* dst, uint32_t length){
-    uint32_t i=0, packetLength=0;
-    uint8_t val;
-    while (1) {
-        packetLength += LoRa_parsePacket(0);
-        if (packetLength>i){
-            while ((val = LoRa_readByte())!=255) {
-              ((uint8_t*)dst)[i++] = val; //read to value
-              if (i>=length)
-                  return;
-            }
-        }
-    }
-}
 
 void sendModel (){
-    LoRa_sendLarge(weights_L1, sizeof(weights_L1));
-    LoRa_sendLarge(weights_L2, sizeof(weights_L2));
+    UART_Write(weights_L1, sizeof(weights_L1));
+    UART_Write(weights_L2, sizeof(weights_L2));
 }
 
 void getModel (){
