@@ -16,7 +16,7 @@
 
 #define LEARNINGRATE 0.6
 #define LEARNINGMOMENTUM 0.9
-#define NODES_L1 21
+#define NODES_L1 23
 #define NODES_L2 3
 
 #define RANDOM_SEED 17762

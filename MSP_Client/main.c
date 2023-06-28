@@ -31,36 +31,35 @@ int main(void)
     srand(RANDOM_SEED);
     while (1)  {
         // if message available on UART
-        if (UART_Read_nb(&msgtype,1)){
-            switch (msgtype)
-                {
-                case MODEL_REQUEST:
-                    UART_Write(&num_epochs, sizeof(num_epochs)); // send number of epochs
-                    sendModel();                                 // send NN weights
-                    num_epochs = 0;                              // reset number of epochs to zero
-                    break;
-                case ML_MODEL:
-                    getModel();
-                    break;
+        UART_Read(&msgtype,1);
+        switch (msgtype)
+            {
+            case MODEL_REQUEST:
+                UART_Write(&num_epochs, sizeof(num_epochs)); // send number of epochs
+                sendModel();                                 // send NN weights
+                num_epochs = 0;                              // reset number of epochs to zero
+                break;
+            case ML_MODEL:
+                getModel();
+                break;
 
-                case TRAINING_SAMPLE:
-                    UART_Read(&class,1);
-                    #ifndef PRE_PROCESSED
-                    UART_Read(&recording, NUM_SAMPLES*2);
-                    feature_extraction(recording, input);
-                    #else
-                    UART_Read(&input, NODES_L0*sizeof(float));
-                    #endif
+            case TRAINING_SAMPLE:
+                UART_Read(&class,1);
+                #ifndef PRE_PROCESSED
+                UART_Read(&recording, sizeof(recording));
+                feature_extraction(recording, input);
+                #else
+                UART_Read(&input, sizeof(input));
+                #endif
 
-                    UART_Write(&input, NODES_L0*sizeof(float));
+                //UART_Write(&input, NODES_L0*sizeof(float));
 
-                    simple_train(class);
-                    UART_Write(&error,sizeof(error));
-                    break;
-                default:
-                    UART_Read(&class,1);
-                    UART_Write(&class,1);
-                }
+                simple_train(class);
+                UART_Write(&error,sizeof(error));
+                break;
+            default:
+                UART_Read(&class,1);
+                UART_Write(&class,1);
             }
     }
 }
@@ -97,15 +96,17 @@ void init()
     WDT_A_holdTimer();
     Interrupt_disableMaster();
 
+    /*
     // left button on msp board
-    MAP_GPIO_setAsInputPinWithPullUpResistor(GPIO_PORT_P1, GPIO_PIN1);
+    GPIO_setAsInputPinWithPullUpResistor(GPIO_PORT_P1, GPIO_PIN1);
 
     // BUTTON B
-    MAP_GPIO_setAsInputPinWithPullUpResistor(GPIO_PORT_P5, GPIO_PIN1);
+    GPIO_setAsInputPinWithPullUpResistor(GPIO_PORT_P5, GPIO_PIN1);
     // BUTTON A
-    MAP_GPIO_setAsInputPinWithPullUpResistor(GPIO_PORT_P3, GPIO_PIN5);
+    GPIO_setAsInputPinWithPullUpResistor(GPIO_PORT_P3, GPIO_PIN5);
     // BUTTON J
-    MAP_GPIO_setAsInputPinWithPullUpResistor(GPIO_PORT_P4, GPIO_PIN1);
+    GPIO_setAsInputPinWithPullUpResistor(GPIO_PORT_P4, GPIO_PIN1);
+    */
 
     /* Set the core voltage level to VCORE1 */
     PCM_setCoreVoltageLevel(PCM_VCORE1);

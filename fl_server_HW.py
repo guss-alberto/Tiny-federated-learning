@@ -29,10 +29,10 @@ N_SAMPLES = 16000
 SAMPLE_RATE = 16000
 path = "../TinyML-FederatedLearning-master/datasets/"
 
-resfile = "C:/Users/guss/Desktop/datta/Test_20_nodes{}.csv"
+resfile = "../Data/Test_HW_Non_IID{}.csv"
 
 PROCESS = True
-IID = True  
+IID = False  
 FILE_SOURCE = "paper"
 
 FRAME_LENGTH_TEST = N_SAMPLES/(SAMPLE_RATE*(NUM_FRAMES+2))
@@ -146,47 +146,44 @@ def enough_data():
         if IID:
             return len(mountains) >= TRAINING_ROUNDS_BEFORE_FL*NUM_CLIENTS
         else:
-            if len(montserrat_files) < TRAINING_ROUNDS_BEFORE_FL*NUM_CLIENTS: return False
-            if len(pedraforca_files) < TRAINING_ROUNDS_BEFORE_FL*NUM_CLIENTS: return False
-            if len(vermell_files) < TRAINING_ROUNDS_BEFORE_FL*NUM_CLIENTS: return False
+            if len(montserrat_files) < TRAINING_ROUNDS_BEFORE_FL: return False
+            if len(pedraforca_files) < TRAINING_ROUNDS_BEFORE_FL: return False
+            if len(vermell_files) < TRAINING_ROUNDS_BEFORE_FL: return False
             return True
     else:
         if IID:
             return len(mountains) >= NUM_CLIENTS*TRAINING_ROUNDS_BEFORE_FL
         else:
-            if len(red_data) < TRAINING_ROUNDS_BEFORE_FL*NUM_CLIENTS: return False
-            if len(green_data) < TRAINING_ROUNDS_BEFORE_FL*NUM_CLIENTS: return False
-            if len(blue_data) < TRAINING_ROUNDS_BEFORE_FL*NUM_CLIENTS: return False
+            if len(red_data) < TRAINING_ROUNDS_BEFORE_FL: return False
+            if len(green_data) < TRAINING_ROUNDS_BEFORE_FL: return False
+            if len(blue_data) < TRAINING_ROUNDS_BEFORE_FL: return False
             return True
 
 def startFL (id, ser, dataset, global_model, local_models, num_epochs):
     rounds = 0
+    errors = []
     print("Device %s start"%id)
     if len(global_model)==NN_SIZE:
         print("Writing new data to device %s"%id)
         buf = ML_MODEL + struct.pack('%sf' % NN_SIZE, *global_model) #send new weights back to device
         ser.write(buf)
     for sample in dataset:
-        buf = TRAINING_SAMPLE + sample
-        ser.write(buf)
-        print (buf)
-        print("------------")
-        tst = ser.read(NODES_L0*4)
-        print(tst)
-        print(struct.unpack('%sf' % NODES_L0, tst))
-        exit()
+        ser.write(TRAINING_SAMPLE) 
+        ser.write(sample)
         rounds+=1
-        error_raw = ser.read(4)
-        error = struct.unpack("f",error_raw)
+        buf = ser.read(4)
+        error = struct.unpack("f",buf)[0]
         print(error)
+        errors.append(error)
     ser.write(MODEL_REQUEST)
     buf = ser.read(2)
-    print(buf)
-    num_epochs[id] = struct.unpack('h', buf)
-    print(num_epochs[id])
+    num_epochs[id] = int.from_bytes(buf, 'little')
 
     buf = ser.read(NN_SIZE*4)
     local_models[id] = struct.unpack('%sf' % NN_SIZE, buf)
+
+    with open(resfile.format(id), "a") as file:
+        file.write('\n'.join( str(error) for error in errors ) + '\n')
 
     return
 
@@ -194,10 +191,20 @@ if __name__ == "__main__":
     client_ports = [] 
     
     for port in device_ports:
-        client_ports.append(serial.Serial(port, baudrate=BAUDRATE, bytesize=8, stopbits=serial.STOPBITS_ONE, timeout=10))
+        client_ports.append(serial.Serial(port, baudrate=BAUDRATE, bytesize=8, stopbits=serial.STOPBITS_ONE,timeout=10))
     round = 0
     global_model = []
-    
+
+    start_time = time.perf_counter()
+    client_ports[0].write(MODEL_REQUEST)
+    client_ports[0].read(NN_SIZE*4+2)
+    end_time = time.perf_counter()
+
+    execution_time_ms = (end_time - start_time) * 1000
+
+    print(f"Execution time: {execution_time_ms} ms")
+    exit()
+
     while enough_data():
         local_models = np.empty((len(device_ports), NN_SIZE), dtype='float32')
         threads = []
@@ -215,6 +222,7 @@ if __name__ == "__main__":
         for thread in threads: thread.join() # Wait for all the threads to end
 
         print ("AVERAGING NN WEIGHTS")
+        print (num_epochs)
         global_model = np.average(local_models, axis=0, weights=num_epochs).tolist()
         round+=1
 

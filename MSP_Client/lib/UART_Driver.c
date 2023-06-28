@@ -17,6 +17,8 @@ void UART_Init(eUSCI_UART_ConfigV1 UARTConfig){
     MAP_UART_enableModule(EUSCI_A0_BASE);
     MAP_UART_enableInterrupt(EUSCI_A0_BASE, EUSCI_A_UART_RECEIVE_INTERRUPT);
     MAP_Interrupt_enableInterrupt(INT_EUSCIA0);
+    UARTA0ReadIndex=0;
+    UARTA0WriteIndex=0;
 }
 
 void UART_Write(const void *Data, uint32_t Size)
@@ -89,7 +91,6 @@ void EUSCIA0_IRQHandler(void)
     if(status & EUSCI_A_UART_RECEIVE_INTERRUPT_FLAG)
     {
         c = UART_receiveData(EUSCI_A0_BASE);
-        UART_transmitData(EUSCI_A0_BASE, c);
         UARTA0Data[UARTA0WriteIndex] = c;
         UARTA0_ADVANCE_WRITE_INDEX;
     }

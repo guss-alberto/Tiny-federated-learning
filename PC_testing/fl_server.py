@@ -28,7 +28,7 @@ N_SAMPLES = 16000
 SAMPLE_RATE = 16000
 path = "../../TinyML-FederatedLearning-master/datasets/"
 
-resfile = "C:/Users/guss/Desktop/datta/wwwwwwww{}.csv"
+resfile = "../Data/Test_IID{}.csv"
 
 PROCESS = True
 IID = True  
